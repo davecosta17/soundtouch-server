@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
@@ -13,5 +14,13 @@
     "axios": "^1.13.6",
     "express": "^5.2.1",
     "ws": "^8.19.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/davecosta17/soundtouch-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/davecosta17/soundtouch-server/issues"
+  },
+  "homepage": "https://github.com/davecosta17/soundtouch-server#readme"
 }
