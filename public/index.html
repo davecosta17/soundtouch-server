@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+
+body{
+background:#111;
+color:white;
+font-family:Arial;
+margin:0;
+}
+
+
+.container{
+
+max-width:450px;
+margin:auto;
+padding:15px;
+
+}
+
+
+.tabs{
+
+display:flex;
+margin-bottom:15px;
+
+}
+
+
+.tab{
+
+flex:1;
+padding:15px;
+text-align:center;
+background:#222;
+cursor:pointer;
+
+}
+
+
+.active{
+
+background:#444;
+
+}
+
+
+.box{
+
+background:#222;
+padding:20px;
+border-radius:10px;
+margin-bottom:15px;
+
+}
+
+
+.title{
+
+font-size:22px;
+margin-bottom:10px;
+
+}
+
+
+button{
+
+font-size:18px;
+padding:10px 20px;
+margin:5px;
+border:none;
+border-radius:8px;
+
+}
+
+
+input{
+
+width:100%;
+
+}
+
+.hidden{
+
+display:none;
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="container">
+
+
+<!-- TABS -->
+
+
+<div class="tabs">
+
+<div id="wifiTab" class="tab active"
+onclick="showTab('wifi')">
+
+WiFi
+
+</div>
+
+
+<div id="bluetoothTab" class="tab"
+onclick="showTab('bluetooth')">
+
+Bluetooth
+
+</div>
+
+
+<div id="auxTab" class="tab"
+onclick="showTab('aux')">
+
+AUX
+
+</div>
+
+
+</div>
+
+
+
+<!-- WIFI TAB -->
+
+
+<div id="wifiPanel">
+
+
+<div class="box">
+
+<div class="title">
+
+WiFi Streaming
+
+</div>
+
+
+<div id="wifiType">
+
+-
+
+</div>
+
+<br>
+
+<div id="wifiTrack">
+
+-
+
+</div>
+
+<div id="wifiArtist">
+
+-
+
+</div>
+
+</div>
+
+
+
+<div class="box">
+
+<button onclick="playPause()">
+
+Play/Pause
+
+</button>
+
+</div>
+
+
+</div>
+
+
+
+
+<!-- BLUETOOTH TAB -->
+
+
+<div id="bluetoothPanel" class="hidden">
+
+
+<div class="box">
+
+<div class="title">
+
+Bluetooth
+
+</div>
+
+
+<div id="btTrack">
+
+-
+
+</div>
+
+<div id="btArtist">
+
+-
+
+</div>
+
+</div>
+
+
+<div class="box">
+
+<button onclick="playPause()">
+
+Play/Pause
+
+</button>
+
+</div>
+
+
+</div>
+
+
+
+
+<!-- AUX TAB -->
+
+
+<div id="auxPanel" class="hidden">
+
+
+<div class="box">
+
+<div class="title">
+
+AUX Input
+
+</div>
+
+
+External Device Connected
+
+
+</div>
+
+
+</div>
+
+<div class="box">
+
+<button onclick="powerToggle()">
+Power
+</button>
+
+<button onclick="muteToggle()">
+Mute
+</button>
+
+<button onclick="playPause()">
+Play/Pause
+</button>
+
+</div>
+
+
+<!-- VOLUME (COMMON) -->
+
+
+<div class="box">
+
+Volume
+
+<br><br>
+
+<input
+type="range"
+min="0"
+max="100"
+id="volumeSlider"
+onchange="setVolume()"
+/>
+
+</div>
+
+
+
+</div>
+
+
+
+
+<script>
+async function powerToggle(){
+
+await fetch('/power');
+
+}
+
+
+async function muteToggle(){
+
+await fetch('/mute');
+
+}
+
+let currentTab="wifi";
+
+
+
+function showTab(tab){
+
+currentTab=tab;
+
+
+wifiPanel.classList.add("hidden");
+bluetoothPanel.classList.add("hidden");
+auxPanel.classList.add("hidden");
+
+
+wifiTab.classList.remove("active");
+bluetoothTab.classList.remove("active");
+auxTab.classList.remove("active");
+
+
+if(tab=="wifi"){
+
+wifiPanel.classList.remove("hidden");
+wifiTab.classList.add("active");
+
+}
+
+
+if(tab=="bluetooth"){
+
+bluetoothPanel.classList.remove("hidden");
+bluetoothTab.classList.add("active");
+
+}
+
+
+if(tab=="aux"){
+
+auxPanel.classList.remove("hidden");
+auxTab.classList.add("active");
+
+}
+
+
+}
+
+
+
+
+async function updateStatus(){
+
+let response=
+await fetch('/status');
+
+let data=
+await response.json();
+
+
+
+volumeSlider.value=
+data.volume;
+
+
+
+// AUTO SWITCH TAB
+
+
+if(data.source=="wifi")
+showTab("wifi");
+
+
+if(data.source=="bluetooth")
+showTab("bluetooth");
+
+
+if(data.source=="aux")
+showTab("aux");
+
+
+
+// WIFI INFO
+
+
+if(data.wifiType=="spotify")
+wifiType.innerText="Spotify Connect";
+
+
+else if(data.wifiType=="airplay")
+wifiType.innerText="AirPlay";
+
+
+else if(data.wifiType=="radio")
+wifiType.innerText="Internet Radio";
+
+
+else
+wifiType.innerText="-";
+
+
+
+wifiTrack.innerText=data.track;
+wifiArtist.innerText=data.artist;
+
+
+
+// BLUETOOTH INFO
+
+
+btTrack.innerText=data.track;
+btArtist.innerText=data.artist;
+
+
+
+}
+
+
+
+const socket =
+new WebSocket(
+`ws://${location.host}`
+);
+
+
+socket.onmessage=function(event){
+
+let data=
+JSON.parse(event.data);
+
+
+
+volumeSlider.value=
+data.volume;
+
+
+
+// AUTO TAB SWITCH
+
+
+if(data.source=="wifi")
+showTab("wifi");
+
+
+if(data.source=="bluetooth")
+showTab("bluetooth");
+
+
+if(data.source=="aux")
+showTab("aux");
+
+
+
+// WIFI LABEL
+
+
+if(data.wifiType=="spotify")
+wifiType.innerText="Spotify Connect";
+
+
+else if(data.wifiType=="airplay")
+wifiType.innerText="AirPlay";
+
+
+else if(data.wifiType=="radio")
+wifiType.innerText="Internet Radio";
+
+
+else
+wifiType.innerText="-";
+
+
+
+wifiTrack.innerText=data.track;
+wifiArtist.innerText=data.artist;
+
+
+btTrack.innerText=data.track;
+btArtist.innerText=data.artist;
+
+
+};
+
+async function setVolume(){
+
+let v=
+volumeSlider.value;
+
+await fetch(`/volume/${v}`);
+
+}
+
+
+
+
+async function playPause(){
+
+await fetch('/play');
+
+}
+
+
+
+</script>
+
+
+</body>
+
+</html>
