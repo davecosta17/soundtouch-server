@@ -1,524 +1,683 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>SoundTouch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
 <style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-body{
-background:#111;
-color:white;
-font-family:Arial;
-margin:0;
-}
+  :root {
+    --top-dark:   #1a1a1a;
+    --mid-grey:   #888888;
+    --bot-light:  #d4d4d4;
+    --accent:     #4a9eff;
+    --white:      #ffffff;
+    --text-dim:   rgba(255,255,255,0.45);
+    --control-shadow: 0 4px 20px rgba(0,0,0,0.35);
+  }
 
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
 
-.container{
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: linear-gradient(180deg,
+      var(--top-dark) 0%,
+      #555 45%,
+      var(--bot-light) 100%
+    );
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    min-height: 100dvh;
+  }
 
-max-width:450px;
-margin:auto;
-padding:15px;
+  .app {
+    width: 100%;
+    max-width: 420px;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: env(safe-area-inset-top, 16px) 28px env(safe-area-inset-bottom, 12px);
+    padding-top: max(env(safe-area-inset-top), 24px);
+  }
 
-}
+  /* ── Top Bar ─────────────────────────────── */
+  .top-bar {
+    display: grid;
+    grid-template-columns: 48px 1fr 48px;
+    align-items: center;
+    padding-top: 8px;
+    margin-bottom: 4px;
+  }
 
+  .icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.9;
+    transition: opacity 0.15s, transform 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .icon-btn:active { transform: scale(0.88); opacity: 0.6; }
+  .icon-btn svg { width: 28px; height: 28px; fill: var(--white); }
+  .icon-btn.muted svg { fill: var(--mid-grey); }
 
-.tabs{
+  .speaker-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--white);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-display:flex;
-margin-bottom:15px;
+  .status-line {
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 300;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin-top: 2px;
+    margin-bottom: 0;
+    height: 18px;
+  }
 
-}
+  /* ── Now Playing Card ────────────────────── */
+  .now-playing-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 0 8px;
+  }
 
+  .now-playing-card {
+    width: 100%;
+    border: 2px solid rgba(255,255,255,0.55);
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(6px);
+    padding: 22px 24px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
 
-.tab{
+  .now-playing-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
 
-flex:1;
-padding:15px;
-text-align:center;
-background:#222;
-cursor:pointer;
+  .np-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
 
-}
+  .np-track {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 1.35rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--white);
+    line-height: 1.2;
+    min-height: 1.4em;
+    transition: opacity 0.3s;
+  }
 
+  .np-artist {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: rgba(255,255,255,0.65);
+    margin-top: 5px;
+    min-height: 1.2em;
+    letter-spacing: 0.03em;
+    transition: opacity 0.3s;
+  }
 
-.active{
+  .np-idle {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
 
-background:#444;
+  /* ── Source Row ──────────────────────────── */
+  .source-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    margin: 18px 0 6px;
+  }
 
-}
+  .source-label {
+    font-size: 0.85rem;
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    color: rgba(40,40,40,0.75);
+  }
 
+  .settings-btn {
+    position: absolute;
+    right: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.3s;
+  }
+  .settings-btn:active { transform: rotate(45deg); }
+  .settings-btn svg { width: 26px; height: 26px; fill: rgba(30,30,30,0.6); }
 
-.box{
+  /* ── Transport ───────────────────────────── */
+  .transport {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    margin: 10px 0 18px;
+  }
 
-background:#222;
-padding:20px;
-border-radius:10px;
-margin-bottom:15px;
+  .btn-skip {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s, opacity 0.12s;
+  }
+  .btn-skip:active { transform: scale(0.85); opacity: 0.55; }
+  .btn-skip svg { width: 44px; height: 44px; fill: var(--white); filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3)); }
 
-}
+  .btn-play {
+    width: 78px;
+    height: 78px;
+    border-radius: 50%;
+    background: var(--white);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--control-shadow);
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s, box-shadow 0.12s;
+    flex-shrink: 0;
+  }
+  .btn-play:active { transform: scale(0.92); box-shadow: 0 2px 10px rgba(0,0,0,0.25); }
+  .btn-play svg { width: 30px; height: 30px; fill: #222; margin-left: 3px; }
+  .btn-play.playing svg { margin-left: 0; }
 
+  /* ── Volume ──────────────────────────────── */
+  .volume-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
 
-.title{
+  .vol-icon { flex-shrink: 0; }
+  .vol-icon svg { width: 22px; height: 22px; fill: rgba(30,30,30,0.6); display: block; }
 
-font-size:22px;
-margin-bottom:10px;
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(to right, rgba(30,30,30,0.5) var(--pct, 10%), rgba(30,30,30,0.18) var(--pct, 10%));
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #2a2a2a;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  input[type=range]:active::-webkit-slider-thumb { transform: scale(1.25); }
+  input[type=range]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #2a2a2a;
+    border: none;
+    cursor: pointer;
+  }
 
-}
+  /* ── Source Tab Bar ──────────────────────── */
+  .source-tabs {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: rgba(200,200,200,0.4);
+    backdrop-filter: blur(8px);
+    border-radius: 14px;
+    padding: 10px 0 8px;
+    margin-bottom: 4px;
+  }
 
+  .src-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 20px;
+    border-radius: 8px;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s;
+    opacity: 0.4;
+  }
+  .src-tab.active { opacity: 1; }
+  .src-tab svg { width: 26px; height: 26px; fill: #333; }
+  .src-tab.active svg { fill: #333; }
+  .src-tab.active.wifi svg { fill: var(--accent); }
+  .src-tab.active.bluetooth svg { fill: #333; }
+  .src-tab span {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #333;
+  }
 
-button{
+  /* ── Offline Banner ──────────────────────── */
+  .offline-banner {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.75);
+    color: rgba(255,255,255,0.7);
+    text-align: center;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    padding: 6px;
+    z-index: 100;
+  }
+  .offline-banner.show { display: block; }
 
-font-size:18px;
-padding:10px 20px;
-margin:5px;
-border:none;
-border-radius:8px;
+  /* ── Settings Panel ──────────────────────── */
+  .settings-panel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .settings-panel.open { display: flex; }
 
-}
+  .settings-sheet {
+    background: #1e1e1e;
+    width: 100%;
+    max-width: 420px;
+    border-radius: 18px 18px 0 0;
+    padding: 20px 24px 32px;
+    animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
 
+  .settings-sheet h2 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 18px;
+  }
 
-input{
+  .station-list { list-style: none; }
+  .station-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .station-list li:last-child { border-bottom: none; }
+  .station-list li:active { opacity: 0.5; }
+  .station-list li span {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--white);
+  }
+  .station-list li .play-icon svg { width: 16px; height: 16px; fill: rgba(255,255,255,0.3); }
 
-width:100%;
-
-}
-
-.hidden{
-
-display:none;
-
-}
-
+  .close-sheet {
+    width: 100%;
+    margin-top: 20px;
+    background: rgba(255,255,255,0.08);
+    border: none;
+    border-radius: 10px;
+    color: rgba(255,255,255,0.6);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .close-sheet:active { background: rgba(255,255,255,0.14); }
 </style>
-
 </head>
-
-
 <body>
 
+<div class="offline-banner" id="offlineBanner">SPEAKER OFFLINE — RETRYING…</div>
 
-<div class="container">
+<div class="app">
 
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <button class="icon-btn" id="btnMute" title="Mute" onclick="api('mute')">
+      <!-- mute icon (slash) -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3.63 3.63a1 1 0 0 0-1.42 1.41L7.29 10.1 7 10.38V7a1 1 0 0 0-1.6-.8L2 8.5H0v7h2l3.4 2.3A1 1 0 0 0 7 17v-1.17l10.36 10.36a1 1 0 0 0 1.42-1.41L3.63 3.63zM7 15.17l-2-1.36V10.2l2 2V15.17zM19 12c0 1.27-.35 2.47-.96 3.5l1.47 1.47A8.93 8.93 0 0 0 21 12c0-3.72-2.26-6.92-5.5-8.33v2.2A6.98 6.98 0 0 1 19 12zM9 4.08v1.86l6 6V4.62A1 1 0 0 0 13.6 3.8L9 7H8.83L9 4.08z"/>
+      </svg>
+    </button>
 
-<!-- TABS -->
+    <div>
+      <div class="speaker-name" id="speakerName">SOUNDTOUCH</div>
+      <div class="status-line" id="statusLine">Connecting…</div>
+    </div>
 
+    <button class="icon-btn" title="Power" onclick="api('power')">
+      <!-- power icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42A6.92 6.92 0 0 1 19 12c0 3.87-3.13 7-7 7A7 7 0 0 1 5 12c0-2.28 1.09-4.3 2.58-5.42L6.17 5.17A8.932 8.932 0 0 0 3 12a9 9 0 0 0 18 0c0-2.74-1.23-5.18-3.17-6.83z"/>
+      </svg>
+    </button>
+  </div>
 
-<div class="tabs">
+  <!-- Now Playing -->
+  <div class="now-playing-wrap">
+    <div class="now-playing-card">
+      <div class="np-label">Now Playing</div>
+      <div class="np-track" id="npTrack"><span class="np-idle">—</span></div>
+      <div class="np-artist" id="npArtist"></div>
+    </div>
+  </div>
 
-<div id="wifiTab" class="tab active"
-onclick="showTab('wifi')">
+  <!-- Source Row -->
+  <div class="source-row">
+    <span class="source-label" id="sourceLabel">Source</span>
+    <button class="settings-btn" title="Stations" onclick="openSettings()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+      </svg>
+    </button>
+  </div>
 
-WiFi
+  <!-- Transport Controls -->
+  <div class="transport">
+    <button class="btn-skip" title="Previous" onclick="api('prev')">
+      <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+    </button>
 
-</div>
+    <button class="btn-play" id="btnPlay" title="Play/Pause" onclick="togglePlay()">
+      <!-- play -->
+      <svg id="iconPlay" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      <!-- pause (hidden) -->
+      <svg id="iconPause" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </button>
 
+    <button class="btn-skip" title="Next" onclick="api('next')">
+      <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
+    </button>
+  </div>
 
-<div id="bluetoothTab" class="tab"
-onclick="showTab('bluetooth')">
+  <!-- Volume -->
+  <div class="volume-row">
+    <div class="vol-icon">
+      <svg viewBox="0 0 24 24"><path d="M18.5 12A4.5 4.5 0 0 0 16 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5zm7-.17v6.34L9.83 13H7v-2h2.83L12 8.83z"/></svg>
+    </div>
+    <input type="range" id="volumeSlider" min="0" max="100" value="10"
+      oninput="onVolumeInput(this.value)"
+      onchange="setVolume(this.value)" />
+    <div class="vol-icon">
+      <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+    </div>
+  </div>
 
-Bluetooth
+  <!-- Source Tabs -->
+  <div class="source-tabs">
+    <button class="src-tab bluetooth" id="tabBluetooth" onclick="void 0">
+      <svg viewBox="0 0 24 24"><path d="M17.71 7.71 12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
+      <span>BT</span>
+    </button>
 
-</div>
+    <button class="src-tab aux" id="tabAux" onclick="void 0">
+      <svg viewBox="0 0 24 24"><path d="M12 3C6.48 3 2 7.48 2 13c0 3.69 2 6.93 5 8.68V19h2v-1.08C10.28 18.62 11.12 19 12 19c.88 0 1.72-.38 3-.92V19h2v2.68C20 19.93 22 16.69 22 13c0-5.52-4.48-10-10-10zm0 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm-4 8c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm8 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+      <span>AUX</span>
+    </button>
 
-
-<div id="auxTab" class="tab"
-onclick="showTab('aux')">
-
-AUX
-
-</div>
-
-
-</div>
-
-
-
-<!-- WIFI TAB -->
-
-
-<div id="wifiPanel">
-
-
-<div class="box">
-
-<div class="title">
-
-WiFi Streaming
-
-</div>
-
-
-<div id="wifiType">
-
--
-
-</div>
-
-<br>
-
-<div id="wifiTrack">
-
--
-
-</div>
-
-<div id="wifiArtist">
-
--
-
-</div>
-
-</div>
-
-
-
-<div class="box">
-
-<button onclick="playPause()">
-
-Play/Pause
-
-</button>
-
-</div>
-
-
-</div>
-
-
-
-
-<!-- BLUETOOTH TAB -->
-
-
-<div id="bluetoothPanel" class="hidden">
-
-
-<div class="box">
-
-<div class="title">
-
-Bluetooth
+    <button class="src-tab wifi" id="tabWifi" onclick="void 0">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c5.52-5.52 14.48-5.52 20 0l2-2C19.93 3.53 9.07 3.53 1 9zm8 8 3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4 2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <span>Wi-Fi</span>
+    </button>
+  </div>
 
 </div>
 
-
-<div id="btTrack">
-
--
-
+<!-- Settings / Stations Panel -->
+<div class="settings-panel" id="settingsPanel" onclick="closeSettingsOnBg(event)">
+  <div class="settings-sheet">
+    <h2>Radio Stations</h2>
+    <ul class="station-list" id="stationList">
+      <li><span>Loading…</span></li>
+    </ul>
+    <button class="close-sheet" onclick="closeSettings()">Close</button>
+  </div>
 </div>
-
-<div id="btArtist">
-
--
-
-</div>
-
-</div>
-
-
-<div class="box">
-
-<button onclick="playPause()">
-
-Play/Pause
-
-</button>
-
-</div>
-
-
-</div>
-
-
-
-
-<!-- AUX TAB -->
-
-
-<div id="auxPanel" class="hidden">
-
-
-<div class="box">
-
-<div class="title">
-
-AUX Input
-
-</div>
-
-
-External Device Connected
-
-
-</div>
-
-
-</div>
-
-<div class="box">
-
-<button onclick="powerToggle()">
-Power
-</button>
-
-<button onclick="muteToggle()">
-Mute
-</button>
-
-<button onclick="playPause()">
-Play/Pause
-</button>
-
-</div>
-
-
-<!-- VOLUME (COMMON) -->
-
-
-<div class="box">
-
-Volume
-
-<br><br>
-
-<input
-type="range"
-min="0"
-max="100"
-id="volumeSlider"
-onchange="setVolume()"
-/>
-
-</div>
-
-
-
-</div>
-
-
-
 
 <script>
-async function powerToggle(){
-
-await fetch('/power');
-
-}
-
-
-async function muteToggle(){
-
-await fetch('/mute');
-
-}
-
-let currentTab="wifi";
-
-
-
-function showTab(tab){
-
-currentTab=tab;
-
-
-wifiPanel.classList.add("hidden");
-bluetoothPanel.classList.add("hidden");
-auxPanel.classList.add("hidden");
-
-
-wifiTab.classList.remove("active");
-bluetoothTab.classList.remove("active");
-auxTab.classList.remove("active");
-
-
-if(tab=="wifi"){
-
-wifiPanel.classList.remove("hidden");
-wifiTab.classList.add("active");
-
-}
-
-
-if(tab=="bluetooth"){
-
-bluetoothPanel.classList.remove("hidden");
-bluetoothTab.classList.add("active");
-
-}
-
-
-if(tab=="aux"){
-
-auxPanel.classList.remove("hidden");
-auxTab.classList.add("active");
-
-}
-
-
-}
-
-
-
-
-async function updateStatus(){
-
-let response=
-await fetch('/status');
-
-let data=
-await response.json();
-
-
-
-volumeSlider.value=
-data.volume;
-
-
-
-// AUTO SWITCH TAB
-
-
-if(data.source=="wifi")
-showTab("wifi");
-
-
-if(data.source=="bluetooth")
-showTab("bluetooth");
-
-
-if(data.source=="aux")
-showTab("aux");
-
-
-
-// WIFI INFO
-
-
-if(data.wifiType=="spotify")
-wifiType.innerText="Spotify Connect";
-
-
-else if(data.wifiType=="airplay")
-wifiType.innerText="AirPlay";
-
-
-else if(data.wifiType=="radio")
-wifiType.innerText="Internet Radio";
-
-
-else
-wifiType.innerText="-";
-
-
-
-wifiTrack.innerText=data.track;
-wifiArtist.innerText=data.artist;
-
-
-
-// BLUETOOTH INFO
-
-
-btTrack.innerText=data.track;
-btArtist.innerText=data.artist;
-
-
-
-}
-
-
-
-const socket =
-new WebSocket(
-`ws://${location.host}`
-);
-
-
-socket.onmessage=function(event){
-
-let data=
-JSON.parse(event.data);
-
-
-
-volumeSlider.value=
-data.volume;
-
-
-
-// AUTO TAB SWITCH
-
-
-if(data.source=="wifi")
-showTab("wifi");
-
-
-if(data.source=="bluetooth")
-showTab("bluetooth");
-
-
-if(data.source=="aux")
-showTab("aux");
-
-
-
-// WIFI LABEL
-
-
-if(data.wifiType=="spotify")
-wifiType.innerText="Spotify Connect";
-
-
-else if(data.wifiType=="airplay")
-wifiType.innerText="AirPlay";
-
-
-else if(data.wifiType=="radio")
-wifiType.innerText="Internet Radio";
-
-
-else
-wifiType.innerText="-";
-
-
-
-wifiTrack.innerText=data.track;
-wifiArtist.innerText=data.artist;
-
-
-btTrack.innerText=data.track;
-btArtist.innerText=data.artist;
-
-
-};
-
-async function setVolume(){
-
-let v=
-volumeSlider.value;
-
-await fetch(`/volume/${v}`);
-
-}
-
-
-
-
-async function playPause(){
-
-await fetch('/play');
-
-}
-
-
-
+  // ── Config ─────────────────────────────────────────────────────────────────
+  const API = ''; // same origin
+  let isPlaying = false;
+  let currentVolume = 10;
+  let volumeDebounce = null;
+
+  // ── WebSocket ──────────────────────────────────────────────────────────────
+  function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}`);
+
+    ws.onmessage = e => {
+      try { applyStatus(JSON.parse(e.data)); }
+      catch {}
+    };
+
+    ws.onopen  = () => document.getElementById('offlineBanner').classList.remove('show');
+    ws.onclose = () => {
+      document.getElementById('offlineBanner').classList.add('show');
+      setTimeout(connectWS, 3000);
+    };
+    ws.onerror = () => ws.close();
+  }
+  connectWS();
+
+  // ── Status Renderer ────────────────────────────────────────────────────────
+  function applyStatus(s) {
+    if (s.error) {
+      document.getElementById('statusLine').textContent = s.error;
+      document.getElementById('npTrack').innerHTML = '<span class="np-idle">—</span>';
+      document.getElementById('npArtist').textContent = '';
+      return;
+    }
+
+    // Speaker name (try once from discovery endpoint)
+    fetchSpeakerName();
+
+    // Status line
+    const statusMap = {
+      PLAY_STATE: 'Playing',
+      PAUSE_STATE: 'Paused',
+      STOP_STATE: 'Stopped',
+      BUFFERING_STATE: 'Buffering…'
+    };
+    document.getElementById('statusLine').textContent = statusMap[s.status] || s.status || '';
+
+    // Play/pause icon
+    isPlaying = s.status === 'PLAY_STATE';
+    document.getElementById('iconPlay').style.display  = isPlaying ? 'none' : '';
+    document.getElementById('iconPause').style.display = isPlaying ? '' : 'none';
+
+    // Now playing
+    const trackEl  = document.getElementById('npTrack');
+    const artistEl = document.getElementById('npArtist');
+
+    if (s.source === 'wifi' && s.wifiType === 'radio') {
+      trackEl.textContent  = s.track || s.artist || 'Internet Radio';
+      artistEl.textContent = s.album || '';
+    } else if (s.track || s.artist) {
+      trackEl.textContent  = s.track  || '';
+      artistEl.textContent = s.artist || '';
+    } else {
+      trackEl.innerHTML = '<span class="np-idle">—</span>';
+      artistEl.textContent = '';
+    }
+
+    // Source label + tabs
+    const srcLabels = {
+      bluetooth: 'Bluetooth',
+      aux: 'AUX In',
+      wifi: s.wifiType === 'spotify'  ? 'Spotify Connect'
+          : s.wifiType === 'airplay'  ? 'AirPlay'
+          : s.wifiType === 'radio'    ? 'Internet Radio'
+          : 'Wi-Fi',
+      unknown: 'Standby'
+    };
+    document.getElementById('sourceLabel').textContent = srcLabels[s.source] ?? 'Source';
+
+    document.getElementById('tabBluetooth').classList.toggle('active', s.source === 'bluetooth');
+    document.getElementById('tabAux').classList.toggle('active', s.source === 'aux');
+    document.getElementById('tabWifi').classList.toggle('active', s.source === 'wifi');
+
+    // Volume (don't override if user is dragging)
+    if (document.activeElement !== document.getElementById('volumeSlider')) {
+      setSliderValue(Number(s.volume));
+    }
+  }
+
+  // ── Speaker Name ───────────────────────────────────────────────────────────
+  let nameFetched = false;
+  async function fetchSpeakerName() {
+    if (nameFetched) return;
+    try {
+      const r = await fetch('/discovery');
+      const d = await r.json();
+      if (d.name) {
+        document.getElementById('speakerName').textContent = d.name.toUpperCase();
+        nameFetched = true;
+      }
+    } catch {}
+  }
+  fetchSpeakerName();
+
+  // ── API Calls ──────────────────────────────────────────────────────────────
+  async function api(endpoint) {
+    try { await fetch(`/${endpoint}`); } catch {}
+  }
+
+  function togglePlay() {
+    api(isPlaying ? 'pause' : 'play');
+  }
+
+  // ── Volume ─────────────────────────────────────────────────────────────────
+  function setSliderValue(val) {
+    currentVolume = val;
+    const slider = document.getElementById('volumeSlider');
+    slider.value = val;
+    slider.style.setProperty('--pct', `${val}%`);
+  }
+
+  function onVolumeInput(val) {
+    // Update visual immediately
+    document.getElementById('volumeSlider').style.setProperty('--pct', `${val}%`);
+  }
+
+  function setVolume(val) {
+    clearTimeout(volumeDebounce);
+    volumeDebounce = setTimeout(() => api(`volume/${val}`), 120);
+  }
+
+  // ── Stations Sheet ─────────────────────────────────────────────────────────
+  async function openSettings() {
+    document.getElementById('settingsPanel').classList.add('open');
+    try {
+      const r = await fetch('/stations');
+      const stations = await r.json();
+      const list = document.getElementById('stationList');
+      list.innerHTML = stations.map((s, i) => `
+        <li onclick="playStation(${i})">
+          <span>${s.name}</span>
+          <div class="play-icon">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        </li>
+      `).join('');
+    } catch {
+      document.getElementById('stationList').innerHTML = '<li><span>Could not load stations</span></li>';
+    }
+  }
+
+  function closeSettings() {
+    document.getElementById('settingsPanel').classList.remove('open');
+  }
+
+  function closeSettingsOnBg(e) {
+    if (e.target === document.getElementById('settingsPanel')) closeSettings();
+  }
+
+  async function playStation(id) {
+    closeSettings();
+    await api(`radio/${id}`);
+  }
 </script>
-
-
 </body>
-
 </html>

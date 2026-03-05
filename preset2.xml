@@ -1,0 +1,8 @@
+<preset id="2">
+<ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl"
+location="http://192.168.1.169:3000/radio/0"
+sourceAccount="" isPresetable="true">
+<itemName>Hitz FM</itemName>
+<containerArt/>
+</ContentItem>
+</preset>
