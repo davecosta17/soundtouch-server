@@ -1,7 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const WebSocket = require('ws');
-const { Bonjour } = require('bonjour-service');
+const mdns = require('multicast-dns');
 const fs = require('fs');
 
 const app = express();
@@ -10,214 +10,430 @@ app.use(express.static('public'));
 
 
 // ─── mDNS Discovery ───────────────────────────────────────────────────────────
-// SoundTouch speakers broadcast themselves as _soundtouch._tcp on the local
-// network. We watch for that service so we never need a hardcoded IP.
+// setSpeaker() does ONE thing: record the IP and fire onDiscovered().
+// It has zero other side effects so nothing can interfere with it.
 
-let speakerIp   = null;   // populated by mDNS, stays current even if IP changes
+const IP_CACHE = './speaker-cache.json';
+
+let speakerIp   = null;
 let speakerName = null;
+let discovered  = false;
 
-const bonjour = new Bonjour();
-const browser = bonjour.find({ type: 'soundtouch' });
+function saveCache(ip, name) {
+    try { fs.writeFileSync(IP_CACHE, JSON.stringify({ ip, name }, null, 2)); }
+    catch (err) { console.error('[Cache] Write failed:', err.message); }
+}
 
-browser.on('up', service => {
-    // A SoundTouch device appeared (or changed IP and re-announced itself)
-    const ip = service.addresses?.find(a => a.includes('.')) ?? service.host;
-    if (speakerIp !== ip) {
-        speakerIp   = ip;
-        speakerName = service.name;
-        console.log(`[mDNS] Speaker found: "${speakerName}" at ${speakerIp}`);
+function setSpeaker(ip, name) {
+    const ipChanged = ip !== speakerIp;
+    speakerIp   = ip;
+    speakerName = name ?? speakerName ?? 'SoundTouch';
+
+    if (!discovered) {
+        discovered = true;
+        console.log(`[Discovery] Speaker "${speakerName}" found at ${speakerIp}`);
+        saveCache(speakerIp, speakerName);
+        onDiscovered();   // ← fires exactly once, cleanly separated
+    } else if (ipChanged) {
+        console.log(`[Discovery] Speaker IP changed to ${speakerIp}`);
+        saveCache(speakerIp, speakerName);
+        onIpChanged();    // ← only reconnects the speaker WS
     }
+}
+
+// ── Load & validate cached IP ─────────────────────────────────────────────────
+async function loadCache() {
+    try {
+        const cache = JSON.parse(fs.readFileSync(IP_CACHE, 'utf8'));
+        if (!cache.ip) return;
+        console.log(`[Cache] Last known IP: ${cache.ip} — validating…`);
+        try {
+            await axios.get(`http://${cache.ip}:8090/info`, { timeout: 2500 });
+            setSpeaker(cache.ip, cache.name);
+            console.log('[Cache] Confirmed — speaker still at', speakerIp);
+        } catch {
+            console.log('[Cache] Stale — will rediscover via mDNS');
+        }
+    } catch { /* no cache yet */ }
+}
+
+// ── Active mDNS querying ──────────────────────────────────────────────────────
+const mcast = mdns();
+
+mcast.on('response', packet => {
+    const ptr = packet.answers.find(
+        a => a.type === 'PTR' && a.name === '_soundtouch._tcp.local'
+    );
+    if (!ptr) return;
+    const name    = ptr.data.replace('._soundtouch._tcp.local', '');
+    const aRecord = packet.additionals.find(a => a.type === 'A');
+    if (aRecord) setSpeaker(aRecord.data, name);
 });
 
-browser.on('down', service => {
-    if (service.name === speakerName) {
-        console.log(`[mDNS] Speaker "${speakerName}" went offline`);
-        // Keep the last known IP — it may just be a brief dropout
-    }
-});
+mcast.on('error', err => console.error('[mDNS] Error:', err.message));
 
-// Helper: returns the base URL or throws a clear error if not yet discovered
+function queryMdns() {
+    if (!discovered) console.log('[mDNS] Querying for _soundtouch._tcp.local…');
+    mcast.query({ questions: [{ name: '_soundtouch._tcp.local', type: 'PTR' }] });
+}
+
+// Query immediately, retry every 5s until found, then slow heartbeat every 30s
+queryMdns();
+const fastInterval = setInterval(() => {
+    queryMdns();
+    if (discovered) {
+        clearInterval(fastInterval);
+        setInterval(queryMdns, 30_000);
+    }
+}, 5_000);
+
+// Start cache validation — runs in parallel, does not block mDNS
+loadCache();
+
+// ── Subnet scanner fallback ───────────────────────────────────────────────────
+// If mDNS is blocked (common on Windows), we scan every IP on the local subnet
+// for port 8090 and check the /info endpoint. Runs only if mDNS hasn't found
+// the speaker within 15 seconds.
+const os = require('os');
+
+function getLocalSubnets() {
+    const interfaces = os.networkInterfaces();
+    const subnets = new Set();
+    for (const iface of Object.values(interfaces)) {
+        for (const addr of iface) {
+            if (addr.family === 'IPv4' && !addr.internal) {
+                subnets.add(addr.address.split('.').slice(0, 3).join('.'));
+            }
+        }
+    }
+    return [...subnets];
+}
+
+async function scanSubnet(subnet) {
+    console.log(`[Scan] Scanning ${subnet}.1–254…`);
+    for (let batch = 0; batch < 255; batch += 30) {
+        if (discovered) return;
+        const checks = [];
+        for (let i = batch + 1; i <= Math.min(batch + 30, 254); i++) {
+            const ip = `${subnet}.${i}`;
+            checks.push(
+                axios.get(`http://${ip}:8090/info`, { timeout: 800 })
+                    .then(res => {
+                        if (!discovered && res.data && res.data.includes('<info')) {
+                            const nameMatch = res.data.match(/<n>(.*?)<\/n>/);
+                            const name = nameMatch ? nameMatch[1] : 'SoundTouch';
+                            console.log(`[Scan] Found speaker at ${ip}`);
+                            setSpeaker(ip, name);
+                        }
+                    })
+                    .catch(() => {})
+            );
+        }
+        await Promise.all(checks);
+    }
+}
+
+async function scanAllSubnets() {
+    if (discovered) return;
+    const subnets = getLocalSubnets();
+    if (!subnets.length) { console.log('[Scan] No network interfaces found'); return; }
+    console.log(`[Scan] mDNS found nothing — scanning subnets: ${subnets.join(', ')}`);
+    await Promise.all(subnets.map(scanSubnet));
+    if (!discovered) console.log('[Scan] Speaker not found — will retry in 60s');
+}
+
+// Wait 15s for mDNS, then fall back to scanning. Re-scan every 60s if still not found.
+setTimeout(() => {
+    if (!discovered) {
+        scanAllSubnets();
+        setInterval(() => { if (!discovered) scanAllSubnets(); }, 60_000);
+    }
+}, 15_000);
+
+// ── URL helper ────────────────────────────────────────────────────────────────
 function speakerUrl() {
-    if (!speakerIp) throw new Error("Speaker not yet discovered on the network");
+    if (!speakerIp) throw new Error('Speaker not yet discovered');
     return `http://${speakerIp}:8090`;
 }
 
-// Cache stations at startup so we're not doing sync disk reads on every request
-const stations = JSON.parse(fs.readFileSync('stations.json'));
+// ── SPEAKER_IP env var override ───────────────────────────────────────────────
+// If mDNS isn't working (e.g. Windows Firewall blocking UDP 5353), set this
+// to skip discovery entirely:
+//   Windows:  set SPEAKER_IP=192.168.1.x && npm start
+//   Mac/Linux: SPEAKER_IP=192.168.1.x npm start
+if (process.env.SPEAKER_IP) {
+    console.log(`[Config] SPEAKER_IP override: ${process.env.SPEAKER_IP}`);
+    setSpeaker(process.env.SPEAKER_IP, process.env.SPEAKER_NAME || 'SoundTouch');
+}
+
+
+// ─── Post-discovery setup ─────────────────────────────────────────────────────
+// These fire AFTER the IP is confirmed — completely decoupled from discovery.
+
+function onDiscovered() {
+    connectSpeakerWs();
+    fetchCapabilities();
+}
+
+function onIpChanged() {
+    connectSpeakerWs();
+    fetchCapabilities();
+}
+
+
+// ─── Speaker WebSocket bridge (port 8080) ─────────────────────────────────────
+// Subscribes to the speaker's own push events so we react instantly to
+// changes from the physical remote, the Bose app, etc.
+
+let speakerWs          = null;
+let speakerWsReady     = false;
+let speakerWsTarget    = null; // IP the current socket was opened to
+
+function connectSpeakerWs() {
+    if (!speakerIp) return;
+
+    // Don't reconnect if already connected to the current IP
+    if (speakerWsTarget === speakerIp && speakerWsReady) return;
+
+    if (speakerWs) {
+        speakerWs.removeAllListeners();
+        try { speakerWs.terminate(); } catch {}
+        speakerWs = null;
+    }
+
+    const target = speakerIp;
+    speakerWsTarget = target;
+    console.log(`[SpeakerWS] Connecting to ws://${target}:8080`);
+
+    const ws = new WebSocket(`ws://${target}:8080`, 'gabbo');
+    speakerWs = ws;
+
+    ws.on('open', () => {
+        console.log('[SpeakerWS] Connected');
+        speakerWsReady = true;
+    });
+
+    ws.on('message', async data => {
+        const xml = data.toString();
+        if (xml.includes('nowPlayingUpdated') || xml.includes('volumeUpdated')) {
+            broadcastStatus();
+        }
+        if (xml.includes('bassUpdated')) {
+            broadcastEq();
+        }
+        if (xml.includes('sourcesUpdated')) {
+            broadcastSources();
+        }
+    });
+
+    ws.on('error', err => {
+        // Log but don't rethrow — the 'close' event will handle retry
+        console.error('[SpeakerWS] Error:', err.message);
+        speakerWsReady = false;
+    });
+
+    ws.on('close', () => {
+        speakerWsReady = false;
+        if (speakerWsTarget !== target) return; // IP changed, new socket already created
+        console.log('[SpeakerWS] Disconnected — retrying in 10s');
+        setTimeout(() => {
+            if (speakerIp && speakerWsTarget === target) connectSpeakerWs();
+        }, 10_000);
+    });
+}
+
+// Fallback poll: fires if speaker WS is down, and a slow heartbeat even when up
+setInterval(() => { if (!speakerWsReady) broadcastStatus(); }, 3_000);
+setInterval(broadcastStatus, 15_000);
+
+
+// ─── Capabilities cache ───────────────────────────────────────────────────────
+// Fetched once on discovery. Tells the EQ endpoints what the speaker supports.
+
+let caps = {
+    hasBass:         false,
+    hasToneControls: false,
+    hasDspControls:  false,
+    bassMin: -9, bassMax: 9, bassDefault: 0
+};
+
+async function fetchCapabilities() {
+    try {
+        const url = speakerUrl();
+        const [capsRes, bassRes] = await Promise.all([
+            axios.get(`${url}/capabilities`,     { timeout: 3000 }),
+            axios.get(`${url}/bassCapabilities`, { timeout: 3000 })
+        ]);
+
+        const ex = (tag, xml) => { const m = xml.match(new RegExp(`<${tag}>(.*?)</${tag}>`)); return m ? m[1] : null; };
+
+        caps.hasToneControls = capsRes.data.includes('audioproducttonecontrols');
+        caps.hasDspControls  = capsRes.data.includes('audiodspcontrols');
+        caps.hasBass         = ex('bassAvailable', bassRes.data) === 'true';
+        caps.bassMin         = Number(ex('bassMin',     bassRes.data) ?? -9);
+        caps.bassMax         = Number(ex('bassMax',     bassRes.data) ?? 9);
+        caps.bassDefault     = Number(ex('bassDefault', bassRes.data) ?? 0);
+
+        console.log(`[Caps] Bass:${caps.hasBass} Tone:${caps.hasToneControls} DSP:${caps.hasDspControls}`);
+    } catch (err) {
+        console.error('[Caps] Fetch failed:', err.message);
+    }
+}
+
+
+// ─── Broadcast helpers ────────────────────────────────────────────────────────
+
+const browserClients = new Set();
+
+function broadcast(payload) {
+    const msg = JSON.stringify(payload);
+    browserClients.forEach(ws => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+    });
+}
+
+async function broadcastStatus() {
+    try { broadcast({ type: 'status', ...await getStatus() }); } catch {}
+}
+
+async function broadcastEq() {
+    try { broadcast({ type: 'eq', ...await getEq() }); } catch {}
+}
+
+async function broadcastSources() {
+    try { broadcast({ type: 'sources', sources: await getSources() }); } catch {}
+}
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Send a key press to the speaker (handles both press and release for held keys)
+const XML_H = { headers: { 'Content-Type': 'application/xml' } };
+
 async function sendKey(key) {
-    const headers = { 'Content-Type': 'application/xml' };
-    await axios.post(
-        `${speakerUrl()}/key`,
-        `<key state="press" sender="Gabbo">${key}</key>`,
-        { headers }
-    );
+    await axios.post(`${speakerUrl()}/key`,
+        `<key state="press" sender="Gabbo">${key}</key>`, XML_H);
 }
 
-// Parse the now_playing and volume XML into a status object
-function parseStatus(nowPlayingXml, volumeXml) {
-
-    function extract(tag) {
-        const match = nowPlayingXml.match(new RegExp(`<${tag}>(.*?)<\/${tag}>`));
-        return match ? match[1] : "";
-    }
-
-    const track  = extract("track");
-    const artist = extract("artist");
-    const album  = extract("album");
-    const status = extract("playStatus");
-
-    const volumeMatch = volumeXml.match(/<actualvolume>(.*?)<\/actualvolume>/);
-    const volume = volumeMatch ? Number(volumeMatch[1]) : 0;
-
-    // Source detection — single authoritative place for this logic
-    let source   = "unknown";
-    let wifiType = null;
-
-    if (nowPlayingXml.includes("AUX IN")) {
-        source = "aux";
-    } else if (nowPlayingXml.includes("RADIO_STREAMING")) {
-        source   = "wifi";
-        wifiType = "radio";
-    } else if (nowPlayingXml.includes("spotify:")) {
-        source   = "wifi";
-        wifiType = "spotify";
-    } else if (nowPlayingXml.includes("AirPlay")) {
-        source   = "wifi";
-        wifiType = "airplay";
-    } else if (track || artist) {
-        source = "bluetooth";
-    }
-
-    return { source, wifiType, track, artist, album, status, volume };
+function ex(xml, tag) {
+    const m = xml.match(new RegExp(`<${tag}[^>]*>(.*?)<\/${tag}>`, 's'));
+    return m ? m[1].trim() : '';
+}
+function attr(xml, tag, a) {
+    const m = xml.match(new RegExp(`<${tag}[^>]*\\s${a}="([^"]*)"`));
+    return m ? m[1] : '';
 }
 
-// Fetch and return a status object, or an error object if the speaker is offline
+function parseStatus(nowXml, volXml) {
+    const track       = ex(nowXml, 'track');
+    const artist      = ex(nowXml, 'artist');
+    const album       = ex(nowXml, 'album');
+    const status      = ex(nowXml, 'playStatus');
+    const stationName = ex(nowXml, 'stationName');
+
+    const volM  = volXml.match(/<actualvolume>(.*?)<\/actualvolume>/);
+    const volume = volM ? Number(volM[1]) : 0;
+
+    let source = 'unknown', wifiType = null;
+    if      (nowXml.includes('AUX IN'))           source = 'aux';
+    else if (nowXml.includes('RADIO_STREAMING')) { source = 'wifi'; wifiType = 'radio'; }
+    else if (nowXml.includes('spotify:'))        { source = 'wifi'; wifiType = 'spotify'; }
+    else if (nowXml.includes('AirPlay'))         { source = 'wifi'; wifiType = 'airplay'; }
+    else if (nowXml.includes('BLUETOOTH') || track || artist) source = 'bluetooth';
+
+    return { source, wifiType, track, artist, album, stationName, status, volume };
+}
+
 async function getStatus() {
     try {
         const url = speakerUrl();
-        const [nowPlaying, volume] = await Promise.all([
+        const [np, vol] = await Promise.all([
             axios.get(`${url}/now_playing`),
             axios.get(`${url}/volume`)
         ]);
-        return parseStatus(nowPlaying.data, volume.data);
-    } catch (err) {
-        console.error("getStatus error:", err.message);
-        return { error: speakerIp ? "Speaker offline" : "Speaker not yet discovered" };
+        return parseStatus(np.data, vol.data);
+    } catch {
+        return { error: speakerIp ? 'Speaker offline' : 'Speaker not yet discovered' };
     }
 }
+
+async function getSources() {
+    const r = await axios.get(`${speakerUrl()}/sources`);
+    const items = [];
+    const re = /<sourceItem\s([^>]*)>(.*?)<\/sourceItem>/gs;
+    let m;
+    while ((m = re.exec(r.data)) !== null) {
+        const a = n => { const x = m[1].match(new RegExp(`${n}="([^"]*)"`)); return x ? x[1] : ''; };
+        items.push({ source: a('source'), sourceAccount: a('sourceAccount'), status: a('status'), label: m[2].trim() });
+    }
+    return items;
+}
+
+async function getEq() {
+    const url = speakerUrl();
+    const result = { bass: null, treble: null, dsp: null };
+
+    if (caps.hasBass || caps.hasToneControls) {
+        try {
+            if (caps.hasToneControls) {
+                const r   = await axios.get(`${url}/audioproducttonecontrols`);
+                const xml = r.data;
+                result.bass   = { value: Number(attr(xml,'bass','value')),   min: Number(attr(xml,'bass','minValue')),   max: Number(attr(xml,'bass','maxValue')),   step: Number(attr(xml,'bass','step'))   };
+                result.treble = { value: Number(attr(xml,'treble','value')), min: Number(attr(xml,'treble','minValue')), max: Number(attr(xml,'treble','maxValue')), step: Number(attr(xml,'treble','step')) };
+            } else if (caps.hasBass) {
+                const r = await axios.get(`${url}/bass`);
+                result.bass = { value: Number(ex(r.data,'actualbass')), min: caps.bassMin, max: caps.bassMax, step: 1 };
+            }
+        } catch {}
+    }
+
+    if (caps.hasDspControls) {
+        try {
+            const r  = await axios.get(`${url}/audiodspcontrols`);
+            const mm = r.data.match(/audiomode="([^"]*)"/);
+            const sm = r.data.match(/supportedaudiomodes="([^"]*)"/);
+            result.dsp = {
+                mode:      mm ? mm[1] : null,
+                supported: sm ? sm[1].split('|') : []
+            };
+        } catch {}
+    }
+
+    return result;
+}
+
+// Cache stations at startup
+const stations = JSON.parse(fs.readFileSync('stations.json'));
 
 
 // ─── Playback Controls ────────────────────────────────────────────────────────
 
-app.get('/power', async (req, res) => {
-    try {
-        await sendKey('POWER');
-        res.send("Power toggled");
-    } catch (err) {
-        console.error('/power error:', err.message);
-        res.status(502).send("Error");
-    }
-});
+const keyRoute = (key, msg) => async (req, res) => {
+    try { await sendKey(key); res.send(msg); }
+    catch (err) { console.error(`[${key}]`, err.message); res.status(502).send('Error'); }
+};
 
-app.get('/mute', async (req, res) => {
-    try {
-        await sendKey('MUTE');
-        res.send("Mute toggled");
-    } catch (err) {
-        console.error('/mute error:', err.message);
-        res.status(502).send("Error");
-    }
-});
+app.get('/power',     keyRoute('POWER',      'Power toggled'));
+app.get('/mute',      keyRoute('MUTE',       'Mute toggled'));
+app.get('/play',      keyRoute('PLAY',       'Playing'));
+app.get('/pause',     keyRoute('PAUSE',      'Paused'));
+app.get('/playpause', keyRoute('PLAY_PAUSE', 'Toggled'));
+app.get('/next',      keyRoute('NEXT_TRACK', 'Next'));
+app.get('/prev',      keyRoute('PREV_TRACK', 'Prev'));
 
-app.get('/play', async (req, res) => {
-    try {
-        await sendKey('PLAY');
-        res.send("Play sent");
-    } catch (err) {
-        console.error('/play error:', err.message);
-        res.status(502).send("Error");
-    }
-});
-
-app.get('/pause', async (req, res) => {
-    try {
-        await sendKey('PAUSE');
-        res.send("Pause sent");
-    } catch (err) {
-        console.error('/pause error:', err.message);
-        res.status(502).send("Error");
-    }
-});
-
-// Toggles between play and pause
-app.get('/playpause', async (req, res) => {
-    try {
-        await sendKey('PLAY_PAUSE');
-        res.send("Play/Pause toggled");
-    } catch (err) {
-        console.error('/playpause error:', err.message);
-        res.status(502).send("Error");
-    }
-});
-
-app.get('/next', async (req, res) => {
-    try {
-        await sendKey('NEXT_TRACK');
-        res.send("Next track");
-    } catch (err) {
-        console.error('/next error:', err.message);
-        res.status(502).send("Error");
-    }
-});
-
-app.get('/prev', async (req, res) => {
-    try {
-        await sendKey('PREV_TRACK');
-        res.send("Previous track");
-    } catch (err) {
-        console.error('/prev error:', err.message);
-        res.status(502).send("Error");
-    }
-});
-
-// Repeat: on | all | off
 app.get('/repeat/:mode', async (req, res) => {
-    const modeMap = {
-        one:  'REPEAT_ONE',
-        all:  'REPEAT_ALL',
-        off:  'REPEAT_OFF'
-    };
-    const key = modeMap[req.params.mode.toLowerCase()];
-    if (!key) return res.status(400).send("Invalid mode. Use: one, all, off");
-    try {
-        await sendKey(key);
-        res.send(`Repeat set to ${req.params.mode}`);
-    } catch (err) {
-        console.error('/repeat error:', err.message);
-        res.status(502).send("Error");
-    }
+    const map = { one: 'REPEAT_ONE', all: 'REPEAT_ALL', off: 'REPEAT_OFF' };
+    const key = map[req.params.mode.toLowerCase()];
+    if (!key) return res.status(400).send('Use: one, all, off');
+    try { await sendKey(key); res.send(`Repeat: ${req.params.mode}`); }
+    catch (err) { res.status(502).send('Error'); }
 });
 
-// Shuffle: on | off
 app.get('/shuffle/:mode', async (req, res) => {
-    const modeMap = {
-        on:  'SHUFFLE_ON',
-        off: 'SHUFFLE_OFF'
-    };
-    const key = modeMap[req.params.mode.toLowerCase()];
-    if (!key) return res.status(400).send("Invalid mode. Use: on, off");
-    try {
-        await sendKey(key);
-        res.send(`Shuffle ${req.params.mode}`);
-    } catch (err) {
-        console.error('/shuffle error:', err.message);
-        res.status(502).send("Error");
-    }
+    const map = { on: 'SHUFFLE_ON', off: 'SHUFFLE_OFF' };
+    const key = map[req.params.mode.toLowerCase()];
+    if (!key) return res.status(400).send('Use: on, off');
+    try { await sendKey(key); res.send(`Shuffle: ${req.params.mode}`); }
+    catch (err) { res.status(502).send('Error'); }
 });
 
 
@@ -225,124 +441,140 @@ app.get('/shuffle/:mode', async (req, res) => {
 
 app.get('/volume/:level', async (req, res) => {
     const level = parseInt(req.params.level, 10);
-    if (isNaN(level) || level < 0 || level > 100) {
-        return res.status(400).send("Volume must be a number between 0 and 100");
+    if (isNaN(level) || level < 0 || level > 100)
+        return res.status(400).send('Volume must be 0–100');
+    try {
+        await axios.post(`${speakerUrl()}/volume`, `<volume>${level}</volume>`, XML_H);
+        res.send(`Volume: ${level}`);
+    } catch (err) { res.status(502).send('Error'); }
+});
+
+
+// ─── Sources ──────────────────────────────────────────────────────────────────
+
+app.get('/sources', async (req, res) => {
+    try { res.json(await getSources()); }
+    catch (err) { console.error('/sources:', err.message); res.status(502).send('Error'); }
+});
+
+app.post('/source', async (req, res) => {
+    const { source, sourceAccount } = req.body;
+    if (!source) return res.status(400).send('source required');
+    let xml;
+    if      (source === 'BLUETOOTH') xml = `<ContentItem source="BLUETOOTH"></ContentItem>`;
+    else if (source === 'AUX')       xml = `<ContentItem source="AUX" sourceAccount="${sourceAccount || 'AUX'}"></ContentItem>`;
+    else {
+        const acct = sourceAccount ? ` sourceAccount="${sourceAccount}"` : '';
+        xml = `<ContentItem source="${source}"${acct}></ContentItem>`;
     }
     try {
-        await axios.post(
-            `${speakerUrl()}/volume`,
-            `<volume>${level}</volume>`,
-            { headers: { 'Content-Type': 'application/xml' } }
-        );
-        res.send(`Volume set to ${level}`);
-    } catch (err) {
-        console.error('/volume error:', err.message);
-        res.status(502).send("Error");
-    }
+        await axios.post(`${speakerUrl()}/select`, xml, XML_H);
+        res.send(`Source: ${source}`);
+    } catch (err) { console.error('/source:', err.message); res.status(502).send('Error'); }
+});
+
+
+// ─── EQ ───────────────────────────────────────────────────────────────────────
+
+app.get('/eq', async (req, res) => {
+    try { res.json(await getEq()); }
+    catch (err) { console.error('/eq:', err.message); res.status(502).send('Error'); }
+});
+
+app.post('/eq/bass', async (req, res) => {
+    const val = parseInt(req.body.value, 10);
+    if (isNaN(val)) return res.status(400).send('value required');
+    try {
+        // Use tone controls if available, fall back to /bass
+        if (caps.hasToneControls) {
+            await axios.post(`${speakerUrl()}/audioproducttonecontrols`,
+                `<audioproducttonecontrols><bass value="${val}" /></audioproducttonecontrols>`, XML_H);
+        } else {
+            await axios.post(`${speakerUrl()}/bass`, `<bass>${val}</bass>`, XML_H);
+        }
+        res.send(`Bass: ${val}`);
+    } catch (err) { res.status(502).send('Error'); }
+});
+
+app.post('/eq/treble', async (req, res) => {
+    const val = parseInt(req.body.value, 10);
+    if (isNaN(val)) return res.status(400).send('value required');
+    try {
+        await axios.post(`${speakerUrl()}/audioproducttonecontrols`,
+            `<audioproducttonecontrols><treble value="${val}" /></audioproducttonecontrols>`, XML_H);
+        res.send(`Treble: ${val}`);
+    } catch (err) { res.status(502).send('Error'); }
+});
+
+app.post('/eq/mode', async (req, res) => {
+    const { mode } = req.body;
+    if (!mode) return res.status(400).send('mode required');
+    try {
+        await axios.post(`${speakerUrl()}/audiodspcontrols`,
+            `<audiodspcontrols audiomode="${mode}" />`, XML_H);
+        res.send(`Mode: ${mode}`);
+    } catch (err) { res.status(502).send('Error'); }
 });
 
 
 // ─── Presets ──────────────────────────────────────────────────────────────────
 
-// Get all 6 presets stored on the speaker
 app.get('/presets', async (req, res) => {
-    try {
-        const response = await axios.get(`${speakerUrl()}/presets`);
-        res.send(response.data); // Returns raw XML — parse on the client if needed
-    } catch (err) {
-        console.error('/presets error:', err.message);
-        res.status(502).send("Error");
-    }
+    try { res.send((await axios.get(`${speakerUrl()}/presets`)).data); }
+    catch (err) { res.status(502).send('Error'); }
 });
 
-// Activate a preset by number (1–6)
 app.get('/preset/:num', async (req, res) => {
     const num = parseInt(req.params.num, 10);
-    if (isNaN(num) || num < 1 || num > 6) {
-        return res.status(400).send("Preset must be a number between 1 and 6");
-    }
-    try {
-        await sendKey(`PRESET_${num}`);
-        res.send(`Preset ${num} activated`);
-    } catch (err) {
-        console.error(`/preset/${num} error:`, err.message);
-        res.status(502).send("Error");
-    }
+    if (isNaN(num) || num < 1 || num > 6) return res.status(400).send('Preset 1–6');
+    try { await sendKey(`PRESET_${num}`); res.send(`Preset ${num}`); }
+    catch (err) { res.status(502).send('Error'); }
 });
 
 
-// ─── Status ───────────────────────────────────────────────────────────────────
+// ─── Status & Discovery ───────────────────────────────────────────────────────
 
-// Show what the mDNS discovery has found — useful for debugging
-app.get('/discovery', (req, res) => {
-    res.json({
-        discovered: !!speakerIp,
-        name: speakerName,
-        ip: speakerIp
-    });
-});
-
-app.get('/status', async (req, res) => {
-    res.json(await getStatus());
-});
+app.get('/discovery', (req, res) => res.json({ discovered, name: speakerName, ip: speakerIp }));
+app.get('/status',    async (req, res) => res.json(await getStatus()));
 
 
 // ─── Stations / Radio ─────────────────────────────────────────────────────────
 
-app.get('/stations', (req, res) => {
-    res.json(stations);
-});
+app.get('/stations', (req, res) => res.json(stations));
 
-// Serve individual station JSON files — the speaker fetches this directly.
-// This avoids relying on content.api.bose.io which will go offline with Bose cloud.
 app.get('/station-data/:id', (req, res) => {
-    const station = stations[req.params.id];
-    if (!station) return res.status(404).send("Station not found");
-    // Bose LOCAL_INTERNET_RADIO JSON format
-    res.json({ name: station.name, imageUrl: "", streamUrl: station.url });
+    const s = stations[req.params.id];
+    if (!s) return res.status(404).send('Not found');
+    res.json({ name: s.name, imageUrl: '', streamUrl: s.url });
 });
 
 app.get('/radio/:id', async (req, res) => {
-    const station = stations[req.params.id];
-    if (!station) return res.status(404).send("Station not found");
-
-    // Point the speaker at our own server for the station JSON, not Bose's cloud.
-    // This will keep working after Bose shuts down content.api.bose.io.
-    const host = req.headers.host; // e.g. "192.168.1.50:3000"
-    const location = `http://${host}/station-data/${req.params.id}`;
-
-    const xml = `<ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl" location="${location}" sourceAccount="">
-<itemName>${station.name}</itemName>
-</ContentItem>`;
-
+    const s = stations[req.params.id];
+    if (!s) return res.status(404).send('Not found');
+    const location = `http://${req.headers.host}/station-data/${req.params.id}`;
+    const xml = `<ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl" location="${location}" sourceAccount=""><itemName>${s.name}</itemName></ContentItem>`;
     try {
-        await axios.post(
-            `${speakerUrl()}/select`,
-            xml,
-            { headers: { 'Content-Type': 'application/xml' } }
-        );
-        res.send("Playing");
-    } catch (err) {
-        console.error(`/radio/${req.params.id} error:`, err.message);
-        res.status(502).send("Radio Error");
-    }
+        await axios.post(`${speakerUrl()}/select`, xml, XML_H);
+        res.send('Playing');
+    } catch (err) { res.status(502).send('Radio Error'); }
 });
 
 
-// ─── WebSocket: push status every second ──────────────────────────────────────
+// ─── HTTP + WebSocket server ───────────────────────────────────────────────────
 
-const server = app.listen(3000, () => {
-    console.log("SoundTouch Server running on port 3000");
-});
-
+const server = app.listen(3000, () => console.log('SoundTouch Server running on port 3000'));
 const wss = new WebSocket.Server({ server });
 
-setInterval(async () => {
-    const status = await getStatus();
-    const payload = JSON.stringify(status);
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(payload);
+wss.on('connection', async ws => {
+    browserClients.add(ws);
+    ws.on('close', () => browserClients.delete(ws));
+    // Send current state immediately on connect
+    try {
+        const [status, eq, sources] = await Promise.all([getStatus(), getEq(), getSources()]);
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'status',  ...status  }));
+            ws.send(JSON.stringify({ type: 'eq',       ...eq      }));
+            ws.send(JSON.stringify({ type: 'sources',  sources    }));
         }
-    });
-}, 1000);
+    } catch {}
+});
