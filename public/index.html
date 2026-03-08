@@ -744,10 +744,21 @@ async function pickSource(i) {
 async function loadStations() {
   try {
     const stations = await fetch('/stations').then(r => r.json());
+    if (!stations.length) {
+      document.getElementById('stationList').innerHTML = '<li><span class="item-name" style="color:rgba(255,255,255,0.3)">No stations yet — add one below</span></li>';
+      return;
+    }
     document.getElementById('stationList').innerHTML = stations.map((s, i) => `
-      <li onclick="playStation(${i})">
-        <span class="item-name">${s.name}</span>
-        <div class="item-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+      <li>
+        <span class="item-name" onclick="playStation(${i})" style="flex:1;cursor:pointer">${s.name}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="item-icon" onclick="playStation(${i})" style="cursor:pointer">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+          <button class="delete-btn" onclick="deleteStation(${i})" title="Remove">
+            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </div>
       </li>`).join('');
   } catch {
     document.getElementById('stationList').innerHTML = '<li><span class="item-name">Could not load stations</span></li>';
@@ -757,6 +768,31 @@ async function loadStations() {
 async function playStation(id) {
   closePanel();
   await api(`radio/${id}`);
+}
+
+async function addStation() {
+  const name = document.getElementById('stationNameInput').value.trim();
+  const url  = document.getElementById('stationUrlInput').value.trim();
+  if (!name || !url) { alert('Please enter both a name and a stream URL.'); return; }
+  try {
+    const res = await fetch('/stations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, url })
+    });
+    if (!res.ok) { alert(await res.text()); return; }
+    document.getElementById('stationNameInput').value = '';
+    document.getElementById('stationUrlInput').value  = '';
+    await loadStations(); // refresh list
+  } catch { alert('Could not save station.'); }
+}
+
+async function deleteStation(id) {
+  if (!confirm('Remove this station?')) return;
+  try {
+    await fetch(`/stations/${id}`, { method: 'DELETE' });
+    await loadStations();
+  } catch { alert('Could not delete station.'); }
 }
 
 // ── Panel open/close/tab ──────────────────────────────────────────────────────

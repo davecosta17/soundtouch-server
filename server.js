@@ -333,6 +333,11 @@ function parseStatus(nowXml, volXml) {
     const volM  = volXml.match(/<actualvolume>(.*?)<\/actualvolume>/);
     const volume = volM ? Number(volM[1]) : 0;
 
+    // Extract Bluetooth device name from ContentItem sourceAccount
+    let bluetoothDevice = null;
+    const btMatch = nowXml.match(/source="BLUETOOTH"[^>]*sourceAccount="([^"]+)"/);
+    if (btMatch && btMatch[1]) bluetoothDevice = btMatch[1];
+
     let source = 'unknown', wifiType = null;
     if      (nowXml.includes('AUX IN'))           source = 'aux';
     else if (nowXml.includes('RADIO_STREAMING')) { source = 'wifi'; wifiType = 'radio'; }
@@ -340,7 +345,7 @@ function parseStatus(nowXml, volXml) {
     else if (nowXml.includes('AirPlay'))         { source = 'wifi'; wifiType = 'airplay'; }
     else if (nowXml.includes('BLUETOOTH') || track || artist) source = 'bluetooth';
 
-    return { source, wifiType, track, artist, album, stationName, status, volume };
+    return { source, wifiType, track, artist, album, stationName, bluetoothDevice, status, volume };
 }
 
 async function getStatus() {
@@ -401,8 +406,8 @@ async function getEq() {
     return result;
 }
 
-// Cache stations at startup
-const stations = JSON.parse(fs.readFileSync('stations.json'));
+// Cache stations at startup (let so we can mutate on POST /stations)
+let stations = JSON.parse(fs.readFileSync('stations.json'));
 
 
 // ─── Playback Controls ────────────────────────────────────────────────────────
@@ -541,6 +546,37 @@ app.get('/status',    async (req, res) => res.json(await getStatus()));
 // ─── Stations / Radio ─────────────────────────────────────────────────────────
 
 app.get('/stations', (req, res) => res.json(stations));
+
+// Add a new radio station
+app.post('/stations', (req, res) => {
+    const { name, url } = req.body;
+    if (!name || !url) return res.status(400).send('name and url are required');
+    try {
+        new URL(url); // validate URL
+    } catch {
+        return res.status(400).send('Invalid URL');
+    }
+    stations.push({ name: name.trim(), url: url.trim() });
+    try {
+        fs.writeFileSync('stations.json', JSON.stringify(stations, null, 2));
+        res.json({ id: stations.length - 1, name: name.trim(), url: url.trim() });
+    } catch (err) {
+        res.status(500).send('Could not save stations');
+    }
+});
+
+// Delete a radio station by index
+app.delete('/stations/:id', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id) || id < 0 || id >= stations.length) return res.status(404).send('Not found');
+    stations.splice(id, 1);
+    try {
+        fs.writeFileSync('stations.json', JSON.stringify(stations, null, 2));
+        res.send('Deleted');
+    } catch {
+        res.status(500).send('Could not save stations');
+    }
+});
 
 app.get('/station-data/:id', (req, res) => {
     const s = stations[req.params.id];
