@@ -224,6 +224,9 @@ function connectSpeakerWs() {
         if (xml.includes('sourcesUpdated')) {
             broadcastSources();
         }
+        if (xml.includes('recentsUpdated')) {
+            broadcastRecents();
+        }
         if (xml.includes('infoUpdated')) {
             // Device name changed — re-fetch and broadcast
             try {
@@ -315,6 +318,28 @@ async function broadcastEq() {
 
 async function broadcastSources() {
     try { broadcast({ type: 'sources', sources: await getSources() }); } catch {}
+}
+
+async function getRecents() {
+    const r = await axios.get(`${speakerUrl()}/recents`, { timeout: 3000 });
+    const items = [];
+    const re = /<recent[^>]*>.*?<contentItem\s([^>]*)>(.*?)<\/contentItem>.*?<\/recent>/gis;
+    let m;
+    while ((m = re.exec(r.data)) !== null && items.length < 10) {
+        const a = n => { const x = m[1].match(new RegExp(`${n}="([^"]*)"`)); return x ? x[1] : ''; };
+        items.push({
+            source:        a('source'),
+            location:      a('location'),
+            sourceAccount: a('sourceAccount'),
+            isPresetable:  a('isPresetable') === 'true',
+            itemName:      m[2].replace(/<[^>]+>/g, '').trim()
+        });
+    }
+    return items;
+}
+
+async function broadcastRecents() {
+    try { broadcast({ type: 'recents', recents: await getRecents() }); } catch {}
 }
 
 
@@ -494,12 +519,18 @@ app.get('/sources', async (req, res) => {
 });
 
 app.post('/source', async (req, res) => {
-    const { source, sourceAccount } = req.body;
+    const { source, sourceAccount, location } = req.body;
     if (!source) return res.status(400).send('source required');
     let xml;
-    if      (source === 'BLUETOOTH') xml = `<ContentItem source="BLUETOOTH"></ContentItem>`;
-    else if (source === 'AUX')       xml = `<ContentItem source="AUX" sourceAccount="${sourceAccount || 'AUX'}"></ContentItem>`;
-    else {
+    if (source === 'BLUETOOTH') {
+        xml = `<ContentItem source="BLUETOOTH"></ContentItem>`;
+    } else if (source === 'AUX') {
+        xml = `<ContentItem source="AUX" sourceAccount="${sourceAccount || 'AUX'}"></ContentItem>`;
+    } else if (location) {
+        // Full content item for recents with known location (Spotify, radio, etc.)
+        const acct = sourceAccount ? ` sourceAccount="${sourceAccount}"` : '';
+        xml = `<ContentItem source="${source}" location="${location}"${acct} isPresetable="false"></ContentItem>`;
+    } else {
         const acct = sourceAccount ? ` sourceAccount="${sourceAccount}"` : '';
         xml = `<ContentItem source="${source}"${acct}></ContentItem>`;
     }
@@ -602,6 +633,11 @@ app.post('/name', async (req, res) => {
 
 // ─── Stations / Radio ─────────────────────────────────────────────────────────
 
+app.get('/recents', async (req, res) => {
+    try { res.json(await getRecents()); }
+    catch (err) { console.error('/recents:', err.message); res.status(502).send('Error'); }
+});
+
 app.get('/stations', (req, res) => res.json(stations));
 
 // Add a new radio station
@@ -663,11 +699,12 @@ wss.on('connection', async ws => {
     ws.on('close', () => browserClients.delete(ws));
     // Send current state immediately on connect
     try {
-        const [status, eq, sources] = await Promise.all([getStatus(), getEq(), getSources()]);
+        const [status, eq, sources, recents] = await Promise.all([getStatus(), getEq(), getSources(), getRecents().catch(() => [])]);
         if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'status',  ...status  }));
             ws.send(JSON.stringify({ type: 'eq',       ...eq      }));
             ws.send(JSON.stringify({ type: 'sources',  sources    }));
+            ws.send(JSON.stringify({ type: 'recents',  recents    }));
         }
     } catch {}
 });
