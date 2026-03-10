@@ -329,7 +329,8 @@ async function sendKey(key) {
 }
 
 function ex(xml, tag) {
-    const m = xml.match(new RegExp(`<${tag}[^>]*>(.*?)<\/${tag}>`, 's'));
+    // (?=[\s>/]) ensures tag name ends at a boundary, so <art> won't match <artist>
+    const m = xml.match(new RegExp(`<${tag}(?=[\\s>/])[^>]*>(.*?)<\\/${tag}>`, 's'));
     return m ? m[1].trim() : '';
 }
 function attr(xml, tag, a) {
