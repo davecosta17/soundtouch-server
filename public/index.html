@@ -62,6 +62,24 @@
     text-transform: uppercase; color: var(--white);
     text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+  .speaker-name { cursor: pointer; }
+  .speaker-name:active { opacity: 0.6; }
+
+  .name-edit-wrap {
+    display: none; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .name-edit-wrap.active { display: flex; }
+  .name-input {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 1.15rem; letter-spacing: 0.1em; text-transform: uppercase;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 6px; color: var(--white); text-align: center;
+    padding: 3px 10px; outline: none; width: 180px;
+  }
+  .name-edit-hint {
+    font-size: 0.65rem; color: rgba(255,255,255,0.4); letter-spacing: 0.06em;
+  }
+
   .status-line {
     text-align: center; font-size: 0.8rem; font-weight: 300;
     letter-spacing: 0.06em; color: var(--text-dim);
@@ -93,17 +111,37 @@
   }
   .np-track {
     font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700; font-size: 1.35rem; letter-spacing: 0.06em;
-    text-transform: uppercase; color: var(--white); line-height: 1.2; min-height: 1.4em;
+    font-weight: 700; font-size: 1.35rem; letter-spacing: 0.04em;
+    color: var(--white); line-height: 1.2; min-height: 1.4em;
   }
   .np-artist {
     font-size: 0.85rem; font-weight: 400;
-    color: rgba(255,255,255,0.65); margin-top: 5px; min-height: 1.2em;
+    color: rgba(255,255,255,0.65); margin-top: 4px; min-height: 1.2em;
+  }
+  .np-album {
+    font-size: 0.72rem; font-weight: 300; letter-spacing: 0.03em;
+    color: rgba(255,255,255,0.35); margin-top: 3px; min-height: 1em;
   }
   .np-idle {
     font-family: 'Barlow Condensed', sans-serif;
     font-weight: 600; font-size: 1.1rem; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--text-dim);
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  .progress-wrap { margin: 12px 0 2px; visibility: hidden; }
+  .progress-bar-track {
+    height: 3px; background: rgba(30,30,30,0.12); border-radius: 2px; overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%; width: 0%;
+    background: rgba(30,30,30,0.6); border-radius: 2px;
+    transition: width 1s linear;
+  }
+  .progress-time {
+    display: flex; justify-content: flex-end; margin-top: 4px;
+    font-size: 0.68rem; font-weight: 300; letter-spacing: 0.06em;
+    color: rgba(30,30,30,0.45);
   }
 
   /* ── Source Row ────────────────────────────────────────────────────────── */
@@ -320,8 +358,13 @@
     <button class="icon-btn" title="Mute" onclick="api('mute')">
       <svg viewBox="0 0 24 24"><path d="M3.63 3.63a1 1 0 0 0-1.42 1.41L7.29 10.1 7 10.38V7a1 1 0 0 0-1.6-.8L2 8.5H0v7h2l3.4 2.3A1 1 0 0 0 7 17v-1.17l10.36 10.36a1 1 0 0 0 1.42-1.41L3.63 3.63zM7 15.17l-2-1.36V10.2l2 2V15.17zM19 12c0 1.27-.35 2.47-.96 3.5l1.47 1.47A8.93 8.93 0 0 0 21 12c0-3.72-2.26-6.92-5.5-8.33v2.2A6.98 6.98 0 0 1 19 12zM9 4.08v1.86l6 6V4.62A1 1 0 0 0 13.6 3.8L9 7H8.83L9 4.08z"/></svg>
     </button>
-    <div>
-      <div class="speaker-name" id="speakerName">SOUNDTOUCH</div>
+    <div style="text-align:center">
+      <div class="speaker-name" id="speakerName" onclick="startRename()" title="Tap to rename">SOUNDTOUCH</div>
+      <div class="name-edit-wrap" id="nameEditWrap">
+        <input class="name-input" id="nameInput" type="text" maxlength="30"
+          onkeydown="onNameKey(event)" onblur="cancelRename()" />
+        <span class="name-edit-hint">Enter to save · Esc to cancel</span>
+      </div>
       <div class="status-line" id="statusLine">Connecting…</div>
     </div>
     <button class="icon-btn" title="Power" onclick="api('power')">
@@ -335,6 +378,7 @@
       <div class="np-label">Now Playing</div>
       <div class="np-track" id="npTrack"><span class="np-idle">—</span></div>
       <div class="np-artist" id="npArtist"></div>
+      <div class="np-album"  id="npAlbum"></div>
     </div>
   </div>
 
@@ -344,6 +388,12 @@
     <button class="settings-btn" title="Settings" onclick="openPanel()">
       <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
     </button>
+  </div>
+
+  <!-- Progress bar & elapsed timer -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="progress-time"><span id="elapsedTime">0:00</span></div>
   </div>
 
   <!-- Transport -->
@@ -375,7 +425,7 @@
       <span>BT</span>
     </button>
     <button class="src-tab aux" id="tabAux" onclick="switchSource('AUX','AUX')">
-      <svg viewBox="0 0 24 24"><path d="M12 3C6.48 3 2 7.48 2 13c0 3.69 2 6.93 5 8.68V19h2v-1.08C10.28 18.62 11.12 19 12 19c.88 0 1.72-.38 3-.92V19h2v2.68C20 19.93 22 16.69 22 13c0-5.52-4.48-10-10-10zm0 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm-4 8c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm8 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M19 5h-1V3h-2v2H8V3H6v2H5C3.9 5 3 5.9 3 7v1h18V7c0-1.1-.9-2-2-2zM3 17c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9H3v8zm12-5h2v2h-2v-2zm-4 0h2v2h-2v-2zm-4 0h2v2H7v-2z"/></svg>
       <span>AUX</span>
     </button>
     <button class="src-tab wifi" id="tabWifi" onclick="openPanel('sources')">
@@ -463,6 +513,54 @@ let speakerCaps    = { hasToneControls: false, hasDspControls: false, bass: { av
 let currentDspMode = null;
 let allSources     = [];
 
+// ── Playback timer ────────────────────────────────────────────────────────────
+let timerInterval = null;
+let timerSeconds  = 0;
+let lastTrackKey  = null;
+
+function updateTimer(s) {
+  const trackKey = s.track || s.stationName || null;
+  const playing  = s.status === 'PLAY_STATE';
+  const wrap     = document.getElementById('progressWrap');
+  const fill     = document.getElementById('progressFill');
+  const timeEl   = document.getElementById('elapsedTime');
+
+  // Reset counter when track changes
+  if (trackKey && trackKey !== lastTrackKey) {
+    timerSeconds = 0;
+    lastTrackKey = trackKey;
+    fill.style.transition = 'none';
+    fill.style.width = '0%';
+    timeEl.textContent = '0:00';
+    setTimeout(() => { fill.style.transition = 'width 1s linear'; }, 50);
+  }
+
+  if (playing && !timerInterval) {
+    wrap.style.visibility = 'visible';
+    timerInterval = setInterval(() => {
+      timerSeconds++;
+      const m = Math.floor(timerSeconds / 60);
+      const sec = String(timerSeconds % 60).padStart(2, '0');
+      timeEl.textContent = m + ':' + sec;
+      // Bar fills over 5 minutes; stays full after that
+      fill.style.width = Math.min(timerSeconds / 300 * 100, 100) + '%';
+    }, 1000);
+  } else if (!playing && timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
+  if (!trackKey || s.status === 'STOP_STATE') {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    timerSeconds  = 0;
+    lastTrackKey  = null;
+    wrap.style.visibility = 'hidden';
+    fill.style.width = '0%';
+    timeEl.textContent = '0:00';
+  }
+}
+
 // ── WebSocket ────────────────────────────────────────────────────────────────
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -470,8 +568,10 @@ function connectWS() {
   ws.onmessage = e => {
     try {
       const msg = JSON.parse(e.data);
-      if (msg.type === 'sourcesChanged') loadSources();
-      else applyStatus(msg);
+      if      (msg.type === 'status')  applyStatus(msg);
+      else if (msg.type === 'eq')      applyEq(msg);
+      else if (msg.type === 'sources') { allSources = msg.sources; refreshSourceBadges(); }
+      else if (msg.type === 'info')    { document.getElementById('speakerName').textContent = msg.name.toUpperCase(); }
     } catch {}
   };
   ws.onopen  = () => document.getElementById('offlineBanner').classList.remove('show');
@@ -489,8 +589,11 @@ function applyStatus(s) {
     document.getElementById('statusLine').textContent = s.error;
     document.getElementById('npTrack').innerHTML = '<span class="np-idle">—</span>';
     document.getElementById('npArtist').textContent = '';
+    document.getElementById('npAlbum').textContent  = '';
     return;
   }
+  // Clear offline banner whenever we get a valid status update
+  document.getElementById('offlineBanner').classList.remove('show');
 
   fetchSpeakerName();
 
@@ -501,20 +604,30 @@ function applyStatus(s) {
   document.getElementById('iconPlay').style.display  = isPlaying ? 'none' : '';
   document.getElementById('iconPause').style.display = isPlaying ? '' : 'none';
 
-  const trackEl = document.getElementById('npTrack'), artistEl = document.getElementById('npArtist');
+  const trackEl  = document.getElementById('npTrack');
+  const artistEl = document.getElementById('npArtist');
+  const albumEl  = document.getElementById('npAlbum');
+
   if (s.source === 'wifi' && s.wifiType === 'radio') {
-    trackEl.textContent  = s.track || s.artist || 'Internet Radio';
-    artistEl.textContent = s.album || '';
+    trackEl.textContent  = s.stationName || s.track || 'Internet Radio';
+    artistEl.textContent = s.track ? (s.artist || '') : '';
+    albumEl.textContent  = '';
   } else if (s.track || s.artist) {
     trackEl.textContent  = s.track  || '';
     artistEl.textContent = s.artist || '';
+    albumEl.textContent  = s.album  || '';
   } else {
-    trackEl.innerHTML = '<span class="np-idle">—</span>';
+    trackEl.innerHTML    = '<span class="np-idle">—</span>';
     artistEl.textContent = '';
+    albumEl.textContent  = '';
   }
 
+  updateTimer(s);
+
+  const btDevice = (s.bluetoothDevice || '').trim();
+  const btLabel = btDevice ? 'Bluetooth · ' + btDevice : 'Bluetooth';
   const srcLabels = {
-    bluetooth: 'Bluetooth', aux: 'AUX In',
+    bluetooth: btLabel, aux: 'AUX In',
     wifi: s.wifiType === 'spotify' ? 'Spotify Connect' : s.wifiType === 'airplay' ? 'AirPlay' : s.wifiType === 'radio' ? 'Internet Radio' : 'Wi-Fi',
     unknown: 'Standby'
   };
@@ -542,6 +655,44 @@ async function fetchSpeakerName() {
   } catch {}
 }
 fetchSpeakerName();
+
+function startRename() {
+  const nameEl = document.getElementById('speakerName');
+  const wrap   = document.getElementById('nameEditWrap');
+  const input  = document.getElementById('nameInput');
+  input.value  = nameEl.textContent;
+  nameEl.style.display = 'none';
+  wrap.classList.add('active');
+  input.focus();
+  input.select();
+}
+
+function cancelRename() {
+  document.getElementById('speakerName').style.display = '';
+  document.getElementById('nameEditWrap').classList.remove('active');
+}
+
+async function commitRename() {
+  const input = document.getElementById('nameInput');
+  const name  = input.value.trim();
+  if (!name) { cancelRename(); return; }
+  try {
+    const res = await fetch('/name', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    if (res.ok) {
+      document.getElementById('speakerName').textContent = name.toUpperCase();
+    }
+  } catch {}
+  cancelRename();
+}
+
+function onNameKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+  if (e.key === 'Escape') cancelRename();
+}
 
 // ── Capabilities ─────────────────────────────────────────────────────────────
 async function loadCapabilities() {

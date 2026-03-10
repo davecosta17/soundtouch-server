@@ -224,6 +224,19 @@ function connectSpeakerWs() {
         if (xml.includes('sourcesUpdated')) {
             broadcastSources();
         }
+        if (xml.includes('infoUpdated')) {
+            // Device name changed — re-fetch and broadcast
+            try {
+                const info = await axios.get(`${speakerUrl()}/info`, { timeout: 3000 });
+                const nameMatch = info.data.match(/<name>(.*?)<\/name>/);
+                if (nameMatch) {
+                    speakerName = nameMatch[1];
+                    saveCache(speakerIp, speakerName);
+                    broadcast({ type: 'info', name: speakerName });
+                    console.log(`[Info] Device name updated: ${speakerName}`);
+                }
+            } catch {}
+        }
     });
 
     ws.on('error', err => {
@@ -310,8 +323,9 @@ async function broadcastSources() {
 const XML_H = { headers: { 'Content-Type': 'application/xml' } };
 
 async function sendKey(key) {
-    await axios.post(`${speakerUrl()}/key`,
-        `<key state="press" sender="Gabbo">${key}</key>`, XML_H);
+    const url = `${speakerUrl()}/key`;
+    await axios.post(url, `<key state="press"   sender="Gabbo">${key}</key>`, XML_H);
+    await axios.post(url, `<key state="release" sender="Gabbo">${key}</key>`, XML_H);
 }
 
 function ex(xml, tag) {
@@ -333,10 +347,13 @@ function parseStatus(nowXml, volXml) {
     const volM  = volXml.match(/<actualvolume>(.*?)<\/actualvolume>/);
     const volume = volM ? Number(volM[1]) : 0;
 
-    // Extract Bluetooth device name from ContentItem sourceAccount
+    // Extract Bluetooth device name — attribute order varies, so search the whole ContentItem tag
     let bluetoothDevice = null;
-    const btMatch = nowXml.match(/source="BLUETOOTH"[^>]*sourceAccount="([^"]+)"/);
-    if (btMatch && btMatch[1]) bluetoothDevice = btMatch[1];
+    const btTagMatch = nowXml.match(/<ContentItem[^>]*source="BLUETOOTH"[^>]*>/);
+    if (btTagMatch) {
+        const acctMatch = btTagMatch[0].match(/sourceAccount="([^"]+)"/);
+        if (acctMatch && acctMatch[1]) bluetoothDevice = acctMatch[1];
+    }
 
     let source = 'unknown', wifiType = null;
     if      (nowXml.includes('AUX IN'))           source = 'aux';
@@ -418,7 +435,16 @@ const keyRoute = (key, msg) => async (req, res) => {
 };
 
 app.get('/power',     keyRoute('POWER',      'Power toggled'));
-app.get('/mute',      keyRoute('MUTE',       'Mute toggled'));
+app.get('/mute', async (req, res) => {
+    try {
+        const volRes = await axios.get(`${speakerUrl()}/volume`, { timeout: 3000 });
+        const isMuted = volRes.data.includes('<muteenabled>true</muteenabled>');
+        const newMute = !isMuted;
+        await axios.post(`${speakerUrl()}/volume`,
+            `<volume><muteenabled>${newMute}</muteenabled></volume>`, XML_H);
+        res.send(newMute ? 'Muted' : 'Unmuted');
+    } catch (err) { console.error('/mute:', err.message); res.status(502).send('Error'); }
+});
 app.get('/play',      keyRoute('PLAY',       'Playing'));
 app.get('/pause',     keyRoute('PAUSE',      'Paused'));
 app.get('/playpause', keyRoute('PLAY_PAUSE', 'Toggled'));
@@ -541,6 +567,19 @@ app.get('/preset/:num', async (req, res) => {
 
 app.get('/discovery', (req, res) => res.json({ discovered, name: speakerName, ip: speakerIp }));
 app.get('/status',    async (req, res) => res.json(await getStatus()));
+
+app.post('/name', async (req, res) => {
+    const { name } = req.body;
+    if (!name || !name.trim()) return res.status(400).send('name is required');
+    const trimmed = name.trim();
+    try {
+        await axios.post(`${speakerUrl()}/name`, `<name>${trimmed}</name>`, XML_H);
+        speakerName = trimmed;
+        saveCache(speakerIp, speakerName);
+        broadcast({ type: 'info', name: speakerName });
+        res.json({ name: speakerName });
+    } catch (err) { console.error('/name:', err.message); res.status(502).send('Error'); }
+});
 
 
 // ─── Stations / Radio ─────────────────────────────────────────────────────────
