@@ -345,9 +345,76 @@
     font-size: 0.85rem; color: rgba(255,255,255,0.3);
     text-align: center; padding: 20px 0; font-style: italic;
   }
+
+  /* ── Background colour overlay ──────────────────────────────────────────── */
+  #bgOverlay {
+    position: fixed; inset: 0; z-index: 0;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.9s ease, background 0.9s ease;
+  }
+  .app { position: relative; z-index: 1; }
+
+  /* ── Art section ─────────────────────────────────────────────────────────── */
+  .art-section {
+    display: none; flex-direction: column; align-items: center;
+    padding: 12px 0 0; flex: 1;
+  }
+  .app.art-mode .art-section    { display: flex; }
+  .app.art-mode .now-playing-wrap { display: none; }
+
+  .art-img {
+    width: 85%;
+    max-width: 340px;
+    max-height: 42vh;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.55);
+    display: block;
+  }
+
+  .art-info {
+    width: 85%; max-width: 340px;
+    margin-top: 14px; text-align: center;
+  }
+  .art-track {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 1.45rem; letter-spacing: 0.04em;
+    color: var(--white); line-height: 1.2;
+  }
+  .art-artist {
+    font-size: 0.9rem; font-weight: 400;
+    color: rgba(255,255,255,0.7); margin-top: 5px;
+  }
+  .art-album {
+    font-size: 0.75rem; font-weight: 300; letter-spacing: 0.03em;
+    color: rgba(255,255,255,0.42); margin-top: 3px;
+  }
+
+  /* ── Art-mode: adapt bottom controls to dark background ─────────────────── */
+  .app.art-mode .source-label          { color: rgba(255,255,255,0.75); }
+  .app.art-mode .settings-btn svg      { fill: rgba(255,255,255,0.7); }
+  .app.art-mode .vol-icon svg          { fill: rgba(255,255,255,0.65); }
+  .app.art-mode .progress-time         { color: rgba(255,255,255,0.5); }
+  .app.art-mode .progress-bar-track    { background: rgba(255,255,255,0.2); }
+  .app.art-mode .progress-bar-fill     { background: rgba(255,255,255,0.8); }
+  .app.art-mode input[type=range] {
+    background: linear-gradient(to right, rgba(255,255,255,0.75) var(--pct,10%), rgba(255,255,255,0.2) var(--pct,10%));
+  }
+  .app.art-mode input[type=range]::-webkit-slider-thumb { background: var(--white); }
+  .app.art-mode .source-tabs {
+    background: rgba(255,255,255,0.12); backdrop-filter: blur(12px);
+  }
+  .app.art-mode .src-tab span          { color: rgba(255,255,255,0.75); }
+  .app.art-mode .src-tab svg           { fill: rgba(255,255,255,0.75); }
+  .app.art-mode .src-tab.active.wifi svg { fill: #7ecfff; }
+  .app.art-mode .btn-skip svg          { filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
 </style>
 </head>
 <body>
+
+<!-- Dynamic colour overlay — sits behind everything, fades in with album art -->
+<div id="bgOverlay"></div>
 
 <div class="offline-banner" id="offlineBanner">SPEAKER OFFLINE — RETRYING…</div>
 
@@ -372,8 +439,18 @@
     </button>
   </div>
 
-  <!-- Now Playing -->
-  <div class="now-playing-wrap">
+  <!-- Art Section — shown when album art is available -->
+  <div class="art-section" id="artSection">
+    <img class="art-img" id="artImg" src="" alt="Album art" crossorigin="anonymous" />
+    <div class="art-info">
+      <div class="art-track"  id="artTrack"></div>
+      <div class="art-artist" id="artArtist"></div>
+      <div class="art-album"  id="artAlbum"></div>
+    </div>
+  </div>
+
+  <!-- Now Playing card — shown when no album art -->
+  <div class="now-playing-wrap" id="npWrap">
     <div class="now-playing-card">
       <div class="np-label">Now Playing</div>
       <div class="np-track" id="npTrack"><span class="np-idle">—</span></div>
@@ -513,6 +590,69 @@ let speakerCaps    = { hasToneControls: false, hasDspControls: false, bass: { av
 let currentDspMode = null;
 let allSources     = [];
 
+// ── Album art & dynamic background ───────────────────────────────────────────
+let lastArtUrl = null;
+
+function extractDominantColor(imgEl) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 24;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgEl, 0, 0, 24, 24);
+    const data = ctx.getImageData(0, 0, 24, 24).data;
+    let r = 0, g = 0, b = 0, count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const br = (data[i] + data[i+1] + data[i+2]) / 3;
+      if (br > 25 && br < 225) { r += data[i]; g += data[i+1]; b += data[i+2]; count++; }
+    }
+    if (!count) return null;
+    return [Math.round(r/count), Math.round(g/count), Math.round(b/count)];
+  } catch { return null; }
+}
+
+function applyBackground(rgb) {
+  const overlay = document.getElementById('bgOverlay');
+  if (!rgb) { overlay.style.opacity = '0'; return; }
+  const [r, g, b] = rgb;
+  const d = (x) => Math.round(x * 0.35);
+  overlay.style.background =
+    `linear-gradient(180deg, rgb(${r},${g},${b}) 0%, rgb(${d(r)},${d(g)},${d(b)}) 45%, #111 100%)`;
+  overlay.style.opacity = '1';
+}
+
+function showArtLayout(proxyUrl, s) {
+  const img = document.getElementById('artImg');
+  const app = document.querySelector('.app');
+
+  img.onload = () => {
+    const rgb = extractDominantColor(img);
+    applyBackground(rgb);
+    app.classList.add('art-mode');
+  };
+  img.onerror = () => {
+    // Image failed — fall back to card layout
+    applyBackground(null);
+    app.classList.remove('art-mode');
+  };
+  img.src = proxyUrl;
+}
+
+function showCardLayout() {
+  document.querySelector('.app').classList.remove('art-mode');
+  applyBackground(null);
+}
+
+function updateArtInfo(s) {
+  const isRadio = s.source === 'wifi' && s.wifiType === 'radio';
+  document.getElementById('artTrack').textContent  = isRadio
+    ? (s.stationName || s.track || 'Internet Radio')
+    : (s.track || '');
+  document.getElementById('artArtist').textContent = isRadio
+    ? (s.track ? (s.artist || '') : '')
+    : (s.artist || '');
+  document.getElementById('artAlbum').textContent  = isRadio ? '' : (s.album || '');
+}
+
 // ── Playback timer ────────────────────────────────────────────────────────────
 let timerInterval = null;
 let timerSeconds  = 0;
@@ -590,6 +730,8 @@ function applyStatus(s) {
     document.getElementById('npTrack').innerHTML = '<span class="np-idle">—</span>';
     document.getElementById('npArtist').textContent = '';
     document.getElementById('npAlbum').textContent  = '';
+    lastArtUrl = null;
+    showCardLayout();
     return;
   }
   // Clear offline banner whenever we get a valid status update
@@ -623,6 +765,19 @@ function applyStatus(s) {
   }
 
   updateTimer(s);
+
+  // Album art — switch layouts if art availability changed
+  const artUrl = s.artUrl || null;
+  if (artUrl !== lastArtUrl) {
+    lastArtUrl = artUrl;
+    if (artUrl) {
+      showArtLayout('/art-proxy?url=' + encodeURIComponent(artUrl), s);
+    } else {
+      showCardLayout();
+    }
+  }
+  // Always keep art-info text current (track may change with same art)
+  if (artUrl) updateArtInfo(s);
 
   const btDevice = (s.bluetoothDevice || '').trim();
   const btLabel = btDevice ? 'Bluetooth · ' + btDevice : 'Bluetooth';
