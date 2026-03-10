@@ -362,7 +362,11 @@ function parseStatus(nowXml, volXml) {
     else if (nowXml.includes('AirPlay'))         { source = 'wifi'; wifiType = 'airplay'; }
     else if (nowXml.includes('BLUETOOTH') || track || artist) source = 'bluetooth';
 
-    return { source, wifiType, track, artist, album, stationName, bluetoothDevice, status, volume };
+    // Extract album art URL — only when image is confirmed present
+    const artStatusM = nowXml.match(/artImageStatus="([^"]*)"/);
+    const artUrl = (artStatusM && artStatusM[1] === 'IMAGE_PRESENT') ? ex(nowXml, 'art') : null;
+
+    return { source, wifiType, track, artist, album, stationName, bluetoothDevice, artUrl, status, volume };
 }
 
 async function getStatus() {
@@ -564,6 +568,19 @@ app.get('/preset/:num', async (req, res) => {
 
 
 // ─── Status & Discovery ───────────────────────────────────────────────────────
+
+// Proxy album art images through our server so the browser can draw them to
+// canvas without CORS issues (needed for dominant colour extraction)
+app.get('/art-proxy', async (req, res) => {
+    const url = req.query.url;
+    if (!url) return res.status(400).send('url required');
+    try {
+        const r = await axios.get(url, { responseType: 'arraybuffer', timeout: 5000 });
+        res.set('Content-Type', r.headers['content-type'] || 'image/jpeg');
+        res.set('Cache-Control', 'public, max-age=3600');
+        res.send(Buffer.from(r.data));
+    } catch { res.status(502).send('Could not fetch art'); }
+});
 
 app.get('/discovery', (req, res) => res.json({ discovered, name: speakerName, ip: speakerIp }));
 app.get('/status',    async (req, res) => res.json(await getStatus()));
