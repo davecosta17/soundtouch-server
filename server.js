@@ -638,6 +638,69 @@ app.get('/recents', async (req, res) => {
     catch (err) { console.error('/recents:', err.message); res.status(502).send('Error'); }
 });
 
+
+// ─── TuneIn Search ────────────────────────────────────────────────────────────
+// Queries the TuneIn OPML API, resolves each result's .pls URL to a direct
+// stream URL, and returns the top 10 stations.
+
+async function resolveStreamUrl(tuneInUrl) {
+    // TuneIn returns a .pls playlist — fetch it and extract the first File= entry
+    try {
+        const r = await axios.get(tuneInUrl, { timeout: 4000, maxRedirects: 5 });
+        const body = r.data.toString();
+
+        // .pls format: File1=http://...
+        const plsMatch = body.match(/^File\d+=(.+)$/mi);
+        if (plsMatch) return plsMatch[1].trim();
+
+        // .m3u format: lines not starting with #
+        const m3uMatch = body.split('\n').find(l => l.trim() && !l.startsWith('#'));
+        if (m3uMatch) return m3uMatch.trim();
+
+        // If it returned a direct stream URL (some stations do this)
+        if (r.headers['content-type']?.includes('audio')) return tuneInUrl;
+    } catch {}
+    return null;
+}
+
+app.get('/tunein/search', async (req, res) => {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.status(400).send('q is required');
+
+    try {
+        const searchRes = await axios.get('http://opml.radiotime.com/Search.ashx', {
+            params: { query: q, render: 'json', types: 'station', limit: 10 },
+            timeout: 5000
+        });
+
+        const body = searchRes.data?.body;
+        if (!Array.isArray(body) || !body.length) return res.json([]);
+
+        // Resolve stream URLs in parallel, keeping order
+        const results = await Promise.all(
+            body
+                .filter(item => item.type === 'audio' && item.URL)
+                .slice(0, 10)
+                .map(async item => {
+                    const streamUrl = await resolveStreamUrl(item.URL);
+                    if (!streamUrl) return null;
+                    return {
+                        name:        item.text || 'Unknown Station',
+                        streamUrl,
+                        bitrate:     item.bitrate   || null,
+                        reliability: item.reliability || null,
+                        subtitle:    item.subtext   || null,
+                    };
+                })
+        );
+
+        res.json(results.filter(Boolean));
+    } catch (err) {
+        console.error('[TuneIn]', err.message);
+        res.status(502).send('TuneIn search failed');
+    }
+});
+
 app.get('/stations', (req, res) => res.json(stations));
 
 // Add a new radio station

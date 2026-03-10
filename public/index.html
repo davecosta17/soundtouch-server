@@ -1226,6 +1226,109 @@ async function playRecent(i) {
     });
   } catch {}
 }
+
+// ── TuneIn Search ─────────────────────────────────────────────────────────────
+let tuneInResultsData = [];
+let tuneInActiveIdx   = null;
+
+async function tuneInSearch() {
+  const q = document.getElementById('tuneInInput').value.trim();
+  if (!q) return;
+
+  const btn     = document.getElementById('tuneInBtn');
+  const results = document.getElementById('tuneInResults');
+  const divider = document.getElementById('tuneInDivider');
+
+  btn.disabled = true;
+  btn.textContent = '…';
+  results.innerHTML = '<ul class="sheet-list"><li><span class="item-name" style="color:rgba(255,255,255,0.35)">Searching…</span></li></ul>';
+  divider.style.display = 'none';
+  tuneInActiveIdx = null;
+
+  try {
+    const data = await fetch(`/tunein/search?q=${encodeURIComponent(q)}`).then(r => r.json());
+    tuneInResultsData = data;
+
+    if (!data.length) {
+      results.innerHTML = '<ul class="sheet-list"><li><span class="item-name" style="color:rgba(255,255,255,0.35)">No results found</span></li></ul>';
+    } else {
+      renderTuneInResults();
+      divider.style.display = '';
+    }
+  } catch {
+    results.innerHTML = '<ul class="sheet-list"><li><span class="item-name" style="color:rgba(255,255,255,0.35)">Search failed — check connection</span></li></ul>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+}
+
+function renderTuneInResults() {
+  const results = document.getElementById('tuneInResults');
+  results.innerHTML = `<ul class="sheet-list">${
+    tuneInResultsData.map((r, i) => {
+      const meta = [r.bitrate ? r.bitrate + ' kbps' : null, r.subtitle].filter(Boolean).join(' · ');
+      const isOpen = tuneInActiveIdx === i;
+      return `<li>
+        <div class="tunein-result-main" onclick="toggleTuneInActions(${i})">
+          <div class="tunein-result-info">
+            <div class="tunein-result-name">${r.name}</div>
+            ${meta ? `<div class="tunein-result-meta">${meta}</div>` : ''}
+          </div>
+          <div class="tunein-chevron ${isOpen ? 'open' : ''}" id="tuneInChevron${i}">
+            <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+          </div>
+        </div>
+        <div class="tunein-actions ${isOpen ? 'open' : ''}" id="tuneInActions${i}">
+          <button class="tunein-action-btn play" onclick="playTuneIn(${i})">▶ Play Now</button>
+          <button class="tunein-action-btn save" onclick="saveTuneIn(${i})">+ Save</button>
+        </div>
+      </li>`;
+    }).join('')
+  }</ul>`;
+}
+
+function toggleTuneInActions(i) {
+  tuneInActiveIdx = (tuneInActiveIdx === i) ? null : i;
+  renderTuneInResults();
+}
+
+async function playTuneIn(i) {
+  const r = tuneInResultsData[i];
+  if (!r) return;
+  closeDrawer();
+  try {
+    // Save stream via station-data mechanism: add temporarily, play, done
+    // Actually post directly to /source as LOCAL_INTERNET_RADIO via a temp station
+    const res = await fetch('/stations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: r.name, url: r.streamUrl, _temp: true })
+    });
+    if (res.ok) {
+      const saved = await res.json();
+      await fetch(`/radio/${saved.id}`);
+    }
+  } catch {}
+}
+
+async function saveTuneIn(i) {
+  const r = tuneInResultsData[i];
+  if (!r) return;
+  try {
+    const res = await fetch('/stations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: r.name, url: r.streamUrl })
+    });
+    if (res.ok) {
+      // Visual feedback on the save button
+      const btn = document.querySelector(`#tuneInActions${i} .save`);
+      if (btn) { btn.textContent = '✓ Saved'; btn.disabled = true; }
+      await loadStations(); // Refresh saved list
+    }
+  } catch {}
+}
 </script>
 </body>
 </html>

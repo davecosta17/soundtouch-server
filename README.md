@@ -30,6 +30,7 @@ The Bose SoundTouch Web API runs entirely over your local network on port 8090. 
 - Switch between Bluetooth, AUX, and Wi-Fi sources
 - Browse and play recently played content
 - Add and manage internet radio stations
+- Search and play stations from TuneIn's directory
 - Album art display with dynamic background colour (Spotify, radio)
 - Bass, treble, and DSP equaliser controls (capability-dependent)
 - Rename the speaker
@@ -181,7 +182,13 @@ Tap the hamburger icon (top left) to open the slide-in drawer. It contains four 
 
 **Recently Played** — last 10 items played on the speaker regardless of source. Tap any item to resume it immediately. The list updates automatically whenever something new is played.
 
-**Radio Stations** — your saved internet radio stations. Tap a station to play it. Use the × button to remove a station. Add new stations using the form at the bottom — enter a name and a direct stream URL (must be an `http://` or `https://` stream, not a playlist page).
+**Radio Stations** — search TuneIn's directory and manage your saved stations.
+
+A search bar at the top lets you search TuneIn's directory. Results show the station name, bitrate, and a short description. Tap a result to reveal two options:
+- **▶ Play Now** — plays the station immediately and closes the drawer
+- **+ Save** — adds the station to your saved list permanently
+
+Below the search results are your saved stations. Tap a station to play it. Use the × button to remove a station. Add new stations using the form at the bottom — enter a name and a direct stream URL (must be an `http://` or `https://` stream, not a playlist page).
 
 **Sources** — all sources the speaker reports, with their current status (Ready / Unavailable). Tap a Ready source to switch to it. The active source is highlighted.
 
@@ -291,6 +298,12 @@ All endpoints are on port 3000. Successful responses return HTTP 200; errors ret
 | `/stations/:id` | DELETE | — | Remove a station by index |
 | `/radio/:id` | GET | — | Play station by index |
 | `/station-data/:id` | GET | — | Station metadata (used by speaker internally) |
+
+### TuneIn
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/tunein/search?q=...` | GET | Search TuneIn directory, returns top 10 resolved stations as `[{ name, streamUrl, bitrate, reliability, subtitle }]` |
 
 ### Art Proxy
 
