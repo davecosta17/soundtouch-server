@@ -443,6 +443,59 @@
   .delete-btn:hover { opacity: 0.7; }
   .delete-btn svg { width: 16px; height: 16px; fill: var(--white); display: block; }
 
+  /* ── TuneIn search ───────────────────────────────────────────────────────── */
+  .tunein-search-row {
+    display: flex; gap: 8px; margin-bottom: 14px;
+  }
+  .tunein-input {
+    flex: 1; background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+    color: var(--white); font-family: 'Barlow', sans-serif;
+    font-size: 0.9rem; padding: 9px 12px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .tunein-input:focus { border-color: rgba(255,255,255,0.35); }
+  .tunein-input::placeholder { color: rgba(255,255,255,0.25); }
+  .tunein-search-btn {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; color: var(--white); cursor: pointer; padding: 9px 14px;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.8rem;
+    font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    transition: background 0.15s; flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tunein-search-btn:active { background: rgba(255,255,255,0.2); }
+  .tunein-search-btn:disabled { opacity: 0.4; cursor: default; }
+  .tunein-results { margin-bottom: 8px; }
+  .tunein-results .sheet-list li { flex-direction: column; align-items: stretch; }
+  .tunein-result-main {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+  }
+  .tunein-result-info { min-width: 0; flex: 1; }
+  .tunein-result-name {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 1rem;
+    font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .tunein-result-meta { font-size: 0.72rem; color: rgba(255,255,255,0.35); margin-top: 2px; }
+  .tunein-chevron svg {
+    width: 16px; height: 16px; fill: rgba(255,255,255,0.25);
+    transition: transform 0.2s; flex-shrink: 0; margin-left: 8px;
+  }
+  .tunein-chevron.open svg { transform: rotate(180deg); }
+  .tunein-actions { display: none; gap: 8px; padding: 10px 0 4px; }
+  .tunein-actions.open { display: flex; }
+  .tunein-action-btn {
+    flex: 1; padding: 9px 0; border-radius: 8px; border: none; cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.8rem;
+    font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    -webkit-tap-highlight-color: transparent; transition: opacity 0.15s;
+  }
+  .tunein-action-btn:active { opacity: 0.7; }
+  .tunein-action-btn.play { background: var(--accent); color: var(--white); }
+  .tunein-action-btn.save { background: rgba(255,255,255,0.1); color: var(--white); border: 1px solid rgba(255,255,255,0.15); }
+  .tunein-divider { border: none; border-top: 1px solid rgba(255,255,255,0.07); margin: 8px 0 16px; }
+
 </style>
 </head>
 <body>
@@ -539,7 +592,7 @@
       <svg viewBox="0 0 24 24"><path d="M19 5h-1V3h-2v2H8V3H6v2H5C3.9 5 3 5.9 3 7v1h18V7c0-1.1-.9-2-2-2zM3 17c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9H3v8zm12-5h2v2h-2v-2zm-4 0h2v2h-2v-2zm-4 0h2v2H7v-2z"/></svg>
       <span>AUX</span>
     </button>
-    <button class="src-tab wifi" id="tabWifi" onclick="openDrawer('sources')">
+    <button class="src-tab wifi" id="tabWifi" onclick="switchSource('TUNEIN', '')" style="flex:1">
       <svg viewBox="0 0 24 24"><path d="M1 9l2 2c5.52-5.52 14.48-5.52 20 0l2-2C19.93 3.53 9.07 3.53 1 9zm8 8 3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4 2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
       <span>Wi-Fi</span>
     </button>
@@ -567,6 +620,18 @@
       <!-- Stations -->
       <div class="drawer-section">
         <span class="drawer-section-label">Radio Stations</span>
+
+        <!-- TuneIn Search -->
+        <div class="tunein-search-row">
+          <input class="tunein-input" id="tuneInInput" type="search"
+            placeholder="Search TuneIn…" maxlength="80"
+            onkeydown="if(event.key==='Enter') tuneInSearch()" />
+          <button class="tunein-search-btn" id="tuneInBtn" onclick="tuneInSearch()">Search</button>
+        </div>
+        <div class="tunein-results" id="tuneInResults"></div>
+        <hr class="tunein-divider" id="tuneInDivider" style="display:none" />
+
+        <!-- Saved Stations -->
         <ul class="sheet-list" id="stationList"><li><span class="item-name">Loading…</span></li></ul>
         <div class="add-station-form">
           <span class="form-label">Add Station</span>
@@ -576,47 +641,7 @@
         </div>
       </div>
 
-      <!-- Sources -->
-      <div class="drawer-section">
-        <span class="drawer-section-label">Sources</span>
-        <ul class="sheet-list" id="sourceList"><li><span class="item-name">Loading…</span></li></ul>
-      </div>
-
-      <!-- EQ -->
-      <div class="drawer-section">
-        <span class="drawer-section-label">EQ</span>
-        <div class="eq-section" id="eqBassSection">
-          <span class="eq-label">Bass</span>
-          <div class="eq-slider-row">
-            <span class="eq-slider-label">Bass</span>
-            <input type="range" id="bassSlider" min="-9" max="9" value="0"
-              oninput="onEqInput('bass', this)" onchange="setBass(this.value)" />
-            <span class="eq-slider-val" id="bassVal">0</span>
-          </div>
-        </div>
-        <div class="eq-section" id="eqToneSection" style="display:none">
-          <span class="eq-label">Tone</span>
-          <div class="eq-slider-row" style="margin-bottom:12px">
-            <span class="eq-slider-label">Bass</span>
-            <input type="range" id="toneBassSlider" min="-9" max="9" value="0"
-              oninput="onEqInput('toneBass', this)" onchange="setTone('bass', this.value)" />
-            <span class="eq-slider-val" id="toneBassVal">0</span>
-          </div>
-          <div class="eq-slider-row">
-            <span class="eq-slider-label">Treble</span>
-            <input type="range" id="toneTrebleSlider" min="-9" max="9" value="0"
-              oninput="onEqInput('toneTreble', this)" onchange="setTone('treble', this.value)" />
-            <span class="eq-slider-val" id="toneTrebleVal">0</span>
-          </div>
-        </div>
-        <div class="eq-section" id="eqDspSection" style="display:none">
-          <span class="eq-label">Audio Mode</span>
-          <div class="dsp-grid" id="dspGrid"></div>
-        </div>
-        <p class="not-supported" id="eqNotSupported" style="display:none">
-          No EQ controls available for this speaker.
-        </p>
-      </div>
+      <!-- Sources and EQ removed — accessible via source tabs and main UI -->
 
     </div>
   </div>
@@ -1143,19 +1168,10 @@ async function deleteStation(id) {
 }
 
 // ── Drawer open/close ────────────────────────────────────────────────────────
-function openDrawer(scrollTo) {
+function openDrawer() {
   document.getElementById('drawerOverlay').classList.add('open');
   loadRecents();
   loadStations();
-  loadSources();
-  loadCapabilities();
-  if (scrollTo) {
-    setTimeout(() => {
-      const map = { sources: 'drawerSources', eq: 'drawerEq', stations: 'drawerStations' };
-      const el = document.getElementById(map[scrollTo]);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 300);
-  }
 }
 
 function closeDrawer(e) {
