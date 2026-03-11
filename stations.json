@@ -1,18 +1,7 @@
 [
   {
-    "name": "BBC World Service West Africa",
-    "url": "http://wsdownload.bbc.co.uk/worldservice/meta/live/shoutcast/mp3/enafw.pls"
-  },
-  {
-    "name": "BBC World Service West Africa",
-    "url": "http://wsdownload.bbc.co.uk/worldservice/meta/live/shoutcast/mp3/enafw.pls"
-  },
-  {
-    "name": "Adom FM",
-    "url": "https://mmg.streamguys1.com/AdomFM-mp3?key=63d8990dfe4438ae984fd70d2d2b4bd31c842c474987bd810ac0e8e0fd62e8cf2015661105cced63ccfdca89a8422ab1"
-  },
-  {
-    "name": "Adom FM",
-    "url": "https://mmg.streamguys1.com/AdomFM-mp3?key=63d8990dfe4438ae984fd70d2d2b4bd31c842c474987bd810ac0e8e0fd62e8cf2015661105cced63ccfdca89a8422ab1"
+    "name": "BBC World Service",
+    "url": "http://stream.live.vc.bbcmedia.co.uk/bbc_world_service",
+    "favicon": "http://cdn-profiles.tunein.com/s24948/images/logoq.jpg?t=1"
   }
 ]

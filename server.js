@@ -639,65 +639,85 @@ app.get('/recents', async (req, res) => {
 });
 
 
-// ─── TuneIn Search ────────────────────────────────────────────────────────────
-// Queries the TuneIn OPML API, resolves each result's .pls URL to a direct
-// stream URL, and returns the top 10 stations.
 
-async function resolveStreamUrl(tuneInUrl) {
-    // TuneIn returns a .pls playlist — fetch it and extract the first File= entry
-    try {
-        const r = await axios.get(tuneInUrl, { timeout: 4000, maxRedirects: 5 });
-        const body = r.data.toString();
-
-        // .pls format: File1=http://...
-        const plsMatch = body.match(/^File\d+=(.+)$/mi);
-        if (plsMatch) return plsMatch[1].trim();
-
-        // .m3u format: lines not starting with #
-        const m3uMatch = body.split('\n').find(l => l.trim() && !l.startsWith('#'));
-        if (m3uMatch) return m3uMatch.trim();
-
-        // If it returned a direct stream URL (some stations do this)
-        if (r.headers['content-type']?.includes('audio')) return tuneInUrl;
-    } catch {}
-    return null;
+// Build the correct JSON format the SoundTouch speaker expects for LOCAL_INTERNET_RADIO
+function boseStationJson(name, streamUrl, imageUrl = '') {
+    return {
+        audio: { hasPlaylist: false, isRealtime: true, streamUrl },
+        imageUrl,
+        name,
+        streamType: 'liveRadio'
+    };
+}
+// Proxy a URL through our server if it's HTTPS (speaker can't handle HTTPS images)
+function proxyIfHttps(url, host) {
+    if (!url) return '';
+    return url.startsWith('https://')
+        ? `http://${host}/radio/stream-proxy?url=${encodeURIComponent(url)}`
+        : url;
 }
 
-app.get('/tunein/search', async (req, res) => {
+// ─── Radio Browser ────────────────────────────────────────────────────────────
+// Open community radio directory — radio-browser.info
+// Returns direct stream URLs, no resolution needed. Filters dead streams via lastcheckok.
+
+app.get('/radio-browser/search', async (req, res) => {
     const q = (req.query.q || '').trim();
     if (!q) return res.status(400).send('q is required');
-
+    // Radio Browser recommends all.api.radio-browser.info — DNS load balancer
+    // that resolves to whichever server is currently available
+    const RB_API = 'https://all.api.radio-browser.info/json/stations/search';
     try {
-        const searchRes = await axios.get('http://opml.radiotime.com/Search.ashx', {
-            params: { query: q, render: 'json', types: 'station', limit: 10 },
-            timeout: 5000
+        console.log(`[RadioBrowser] Searching: "${q}" via ${RB_API}`);
+        const r = await axios.get(RB_API, {
+            params: {
+                name: q, limit: 10, hidebroken: true,
+                lastcheckok: 1, order: 'clickcount', reverse: true
+            },
+            headers: { 'User-Agent': 'SoundTouchLocalServer/1.0' },
+            timeout: 8000
         });
-
-        const body = searchRes.data?.body;
-        if (!Array.isArray(body) || !body.length) return res.json([]);
-
-        // Resolve stream URLs in parallel, keeping order
-        const results = await Promise.all(
-            body
-                .filter(item => item.type === 'audio' && item.URL)
-                .slice(0, 10)
-                .map(async item => {
-                    const streamUrl = await resolveStreamUrl(item.URL);
-                    if (!streamUrl) return null;
-                    return {
-                        name:        item.text || 'Unknown Station',
-                        streamUrl,
-                        bitrate:     item.bitrate   || null,
-                        reliability: item.reliability || null,
-                        subtitle:    item.subtext   || null,
-                    };
-                })
-        );
-
-        res.json(results.filter(Boolean));
+        console.log(`[RadioBrowser] Got ${r.data?.length ?? 0} results`);
+        const stations = (r.data || []).map(s => ({
+            name:        s.name,
+            streamUrl:   s.url_resolved || s.url,
+            bitrate:     s.bitrate    || null,
+            codec:       s.codec      || null,
+            country:     s.country    || null,
+            language:    s.language   || null,
+            tags:        s.tags       || null,
+            favicon:     s.favicon    || null,
+            stationuuid: s.stationuuid,
+        }));
+        res.json(stations);
     } catch (err) {
-        console.error('[TuneIn]', err.message);
-        res.status(502).send('TuneIn search failed');
+        console.error('[RadioBrowser] Error:', err.message);
+        console.error('[RadioBrowser] Code:', err.code);
+        if (err.response) console.error('[RadioBrowser] Status:', err.response.status);
+        res.status(502).send('Radio Browser search failed');
+    }
+});
+
+// Play a Radio Browser station.
+// url_resolved is already a direct stream — just wrap HTTPS if needed.
+app.post('/radio-browser/play', async (req, res) => {
+    const { streamUrl, name, favicon } = req.body;
+    if (!streamUrl) return res.status(400).send('streamUrl required');
+    try {
+        const safeName    = (name || 'Radio').replace(/[<>&"]/g, '');
+        const safeStream  = streamUrl.startsWith('https://')
+            ? `http://${req.headers.host}/radio/stream-proxy?url=${encodeURIComponent(streamUrl)}`
+            : streamUrl;
+        const safeImage   = proxyIfHttps(favicon || '', req.headers.host);
+        // Use /orion/station pattern — encode all station data as base64
+        const stationData = Buffer.from(JSON.stringify({ name: safeName, imageUrl: safeImage, streamUrl: safeStream })).toString('base64');
+        const location    = `http://${req.headers.host}/orion/station?data=${stationData}`;
+        const xml = `<ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl" location="${location}" sourceAccount=""><itemName>${safeName}</itemName></ContentItem>`;
+        await axios.post(`${speakerUrl()}/select`, xml, XML_H);
+        res.send('Playing');
+    } catch (err) {
+        console.error('[RadioBrowser/play]', err.message);
+        res.status(502).send('Playback failed');
     }
 });
 
@@ -705,17 +725,19 @@ app.get('/stations', (req, res) => res.json(stations));
 
 // Add a new radio station
 app.post('/stations', (req, res) => {
-    const { name, url } = req.body;
+    const { name, url, favicon } = req.body;
     if (!name || !url) return res.status(400).send('name and url are required');
     try {
         new URL(url); // validate URL
     } catch {
         return res.status(400).send('Invalid URL');
     }
-    stations.push({ name: name.trim(), url: url.trim() });
+    const station = { name: name.trim(), url: url.trim() };
+    if (favicon) station.favicon = favicon.trim();
+    stations.push(station);
     try {
         fs.writeFileSync('stations.json', JSON.stringify(stations, null, 2));
-        res.json({ id: stations.length - 1, name: name.trim(), url: url.trim() });
+        res.json({ id: stations.length - 1, ...station });
     } catch (err) {
         res.status(500).send('Could not save stations');
     }
@@ -734,16 +756,86 @@ app.delete('/stations/:id', (req, res) => {
     }
 });
 
+// Audio proxy — pipes a stream (HTTP or HTTPS) to the speaker over plain HTTP.
+// Needed because SoundTouch firmware can't connect to HTTPS audio streams.
+app.get('/radio/stream-proxy', async (req, res) => {
+    const url = req.query.url;
+    if (!url) return res.status(400).send('url required');
+    console.log(`[StreamProxy] Piping: ${url}`);
+    try {
+        const upstream = await axios.get(url, {
+            responseType: 'stream',
+            timeout: 10000,
+            maxRedirects: 5,
+            headers: { 'User-Agent': 'Mozilla/5.0', 'Icy-MetaData': '0' }
+        });
+        // Forward content-type so speaker knows it's audio
+        const ct = upstream.headers['content-type'] || 'audio/mpeg';
+        res.setHeader('Content-Type', ct);
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Transfer-Encoding', 'chunked');
+        upstream.data.pipe(res);
+        upstream.data.on('error', () => res.end());
+        req.on('close', () => upstream.data.destroy());
+    } catch (err) {
+        console.error(`[StreamProxy] Error: ${err.message}`);
+        res.status(502).send('Stream proxy error');
+    }
+});
+
+// ── Debug logger — logs all requests to metadata endpoints ───────────────────
+app.use((req, res, next) => {
+    if (req.path.startsWith('/station-data') || req.path.startsWith('/radio/') || req.path.startsWith('/orion/')) {
+        console.log(`[SpeakerFetch] ${req.method} ${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`);
+        console.log(`[SpeakerFetch] Accept: ${req.headers['accept'] || 'none'}`);
+        console.log(`[SpeakerFetch] User-Agent: ${req.headers['user-agent'] || 'none'}`);
+        const origJson = res.json.bind(res);
+        const origSend = res.send.bind(res);
+        res.json = (body) => { console.log('[SpeakerFetch] Response (JSON):', JSON.stringify(body)); return origJson(body); };
+        res.send = (body) => { console.log('[SpeakerFetch] Response (send):', String(body).substring(0, 200)); return origSend(body); };
+    }
+    next();
+});
+
+// Replicates the Bose cloud endpoint the speaker originally used.
+// Speaker sends GET /orion/station?data=<base64 encoded JSON>
+// We decode it and return the streamUrl as plain text — the simplest possible response.
+app.get('/orion/station', (req, res) => {
+    try {
+        const data = JSON.parse(Buffer.from(req.query.data, 'base64').toString('utf8'));
+        const streamUrl = data.streamUrl;
+        console.log(`[Orion] Decoded station: ${data.name} -> ${streamUrl}`);
+        if (!streamUrl) return res.status(400).send('no streamUrl in data');
+        // Return the correct Bose station JSON format
+        res.json(boseStationJson(data.name, streamUrl, data.imageUrl || ''));
+    } catch (err) {
+        console.error('[Orion] Decode error:', err.message);
+        res.status(400).send('bad data');
+    }
+});
+
+// Legacy metadata endpoint — kept for backward compatibility
+app.get('/radio/stream-data', (req, res) => {
+    const { url, name, imageUrl } = req.query;
+    if (!url) return res.status(400).send('url required');
+    console.log(`[StreamData] url: ${url}, name: ${name}, imageUrl: ${imageUrl || 'none'}`);
+    res.json(boseStationJson(name || 'Radio', url, imageUrl || ''));
+});
+
 app.get('/station-data/:id', (req, res) => {
     const s = stations[req.params.id];
     if (!s) return res.status(404).send('Not found');
-    res.json({ name: s.name, imageUrl: '', streamUrl: s.url });
+    const imageUrl = proxyIfHttps(s.favicon || '', req.headers.host);
+    console.log(`[StationData] ${s.name} -> ${s.url}, image: ${imageUrl || 'none'}`);
+    res.json(boseStationJson(s.name, s.url, imageUrl));
 });
 
 app.get('/radio/:id', async (req, res) => {
     const s = stations[req.params.id];
     if (!s) return res.status(404).send('Not found');
-    const location = `http://${req.headers.host}/station-data/${req.params.id}`;
+    const imageUrl    = proxyIfHttps(s.favicon || '', req.headers.host);
+    const stationData = Buffer.from(JSON.stringify({ name: s.name, imageUrl, streamUrl: s.url })).toString('base64');
+    const location = `http://${req.headers.host}/orion/station?data=${stationData}`;
     const xml = `<ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl" location="${location}" sourceAccount=""><itemName>${s.name}</itemName></ContentItem>`;
     try {
         await axios.post(`${speakerUrl()}/select`, xml, XML_H);
