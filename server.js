@@ -415,7 +415,9 @@ async function getSources() {
     let m;
     while ((m = re.exec(r.data)) !== null) {
         const a = n => { const x = m[1].match(new RegExp(`${n}="([^"]*)"`)); return x ? x[1] : ''; };
-        items.push({ source: a('source'), sourceAccount: a('sourceAccount'), status: a('status'), label: m[2].trim() });
+        const rawLabel = m[2].trim();
+        const label = rawLabel.replace(/<[^>]*>/g, '').trim() || a('source');
+        items.push({ source: a('source'), sourceAccount: a('sourceAccount'), status: a('status'), label });
     }
     return items;
 }

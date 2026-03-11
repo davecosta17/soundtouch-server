@@ -183,8 +183,6 @@
 
   /* ── Volume ────────────────────────────────────────────────────────────── */
   .volume-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-  .vol-icon { flex-shrink: 0; }
-  .vol-icon svg { width: 22px; height: 22px; fill: rgba(30,30,30,0.6); display: block; }
 
   input[type=range] {
     -webkit-appearance: none; appearance: none; flex: 1; height: 3px;
@@ -207,20 +205,56 @@
     display: flex; justify-content: space-around; align-items: center;
     background: rgba(200,200,200,0.4); backdrop-filter: blur(8px);
     border-radius: 14px; padding: 10px 0 8px; margin-bottom: 4px;
+    position: relative;
   }
   .src-tab {
     display: flex; flex-direction: column; align-items: center; gap: 4px;
     background: none; border: none; cursor: pointer; padding: 4px 20px;
     border-radius: 8px; -webkit-tap-highlight-color: transparent;
-    transition: opacity 0.15s; opacity: 0.4;
+    transition: opacity 0.15s, filter 0.15s; opacity: 0.35; position: relative;
   }
   .src-tab.active { opacity: 1; }
-  .src-tab svg { width: 26px; height: 26px; fill: #333; }
-  .src-tab.active.wifi svg { fill: var(--accent); }
+  .src-tab svg { width: 26px; height: 26px; fill: #333; transition: fill 0.15s, filter 0.15s; }
+  .src-tab.active svg {
+    fill: #b8ff00;
+    filter: drop-shadow(0 0 6px rgba(184,255,0,0.7));
+  }
   .src-tab span {
     font-family: 'Barlow Condensed', sans-serif; font-size: 0.65rem;
-    font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #333;
+    font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #333; transition: color 0.15s;
   }
+  .src-tab.active span { color: #b8ff00; }
+
+  /* Wi-Fi popover — positioned relative to source-tabs */
+  .wifi-popover {
+    display: none; position: absolute;
+    bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+    background: rgba(28,28,32,0.97); backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
+    padding: 6px; min-width: 180px; z-index: 200;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .wifi-popover.open { display: block; }
+  .wifi-popover::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 7px solid transparent; border-top-color: rgba(28,28,32,0.97);
+  }
+  .wifi-popover-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 14px; border-radius: 10px; cursor: pointer;
+    transition: background 0.15s; -webkit-tap-highlight-color: transparent;
+  }
+  .wifi-popover-item:active { background: rgba(255,255,255,0.1); }
+  .wifi-popover-item svg { width: 20px; height: 20px; flex-shrink: 0; fill: rgba(255,255,255,0.6); }
+  .wifi-popover-item span {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.95rem;
+    font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: rgba(255,255,255,0.85);
+  }
+  .wifi-popover-item.spotify svg { fill: #1DB954; }
+  .wifi-popover-item.radio svg   { fill: #4a9eff; }
 
   /* ── Offline Banner ────────────────────────────────────────────────────── */
   .offline-banner {
@@ -329,7 +363,6 @@
   /* ── Art-mode: adapt bottom controls to dark background ─────────────────── */
   .app.art-mode .source-label          { color: rgba(255,255,255,0.75); }
   .app.art-mode .settings-btn svg      { fill: rgba(255,255,255,0.7); }
-  .app.art-mode .vol-icon svg          { fill: rgba(255,255,255,0.65); }
   .app.art-mode .progress-time         { color: rgba(255,255,255,0.5); }
   .app.art-mode .progress-bar-track    { background: rgba(255,255,255,0.2); }
   .app.art-mode .progress-bar-fill     { background: rgba(255,255,255,0.8); }
@@ -340,9 +373,10 @@
   .app.art-mode .source-tabs {
     background: rgba(255,255,255,0.12); backdrop-filter: blur(12px);
   }
-  .app.art-mode .src-tab span          { color: rgba(255,255,255,0.75); }
-  .app.art-mode .src-tab svg           { fill: rgba(255,255,255,0.75); }
-  .app.art-mode .src-tab.active.wifi svg { fill: #7ecfff; }
+  .app.art-mode .src-tab span          { color: rgba(255,255,255,0.55); }
+  .app.art-mode .src-tab svg           { fill: rgba(255,255,255,0.55); }
+  .app.art-mode .src-tab.active svg    { fill: #b8ff00; filter: drop-shadow(0 0 6px rgba(184,255,0,0.7)); }
+  .app.art-mode .src-tab.active span   { color: #b8ff00; }
   .app.art-mode .btn-skip svg          { filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
 
   /* ── Shared list styles (drawer content) ────────────────────────────────── */
@@ -600,23 +634,41 @@
     </button>
     <input type="range" id="volumeSlider" min="0" max="100" value="10"
       oninput="onVolumeInput(this.value)" onchange="setVolume(this.value)" />
-    <div class="vol-icon"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></div>
   </div>
 
   <!-- Source Tabs -->
   <div class="source-tabs">
+
+    <!-- Wi-Fi popover — positioned relative to .source-tabs -->
+    <div class="wifi-popover" id="wifiPopover">
+      <div class="wifi-popover-item spotify" onclick="switchSpotify()">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.65 14.4c-.2.32-.62.42-.94.22-2.57-1.57-5.8-1.93-9.61-1.06-.37.08-.73-.14-.82-.51-.08-.37.14-.73.51-.82 4.17-.95 7.75-.54 10.63 1.22.32.2.42.62.23.95zm1.24-2.76c-.25.4-.78.52-1.18.28-2.94-1.81-7.43-2.33-10.91-1.28-.45.14-.93-.12-1.07-.57-.13-.45.12-.93.57-1.07 3.98-1.21 8.93-.62 12.31 1.46.4.24.52.78.28 1.18zm.11-2.87C14.25 8.88 8.8 8.7 5.44 9.7c-.54.16-1.11-.14-1.27-.68-.16-.54.14-1.11.68-1.27 3.88-1.18 10.33-.95 14.4 1.47.49.28.65.9.37 1.38-.28.49-.9.65-1.38.37z"/></svg>
+        <span>Spotify</span>
+      </div>
+      <div class="wifi-popover-item radio" onclick="openRadioDrawer()">
+        <svg viewBox="0 0 24 24"><path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12h20V8c0-.83-.51-1.57-1.24-1.85L13 3.18c-.62-.24-1.38-.24-2 0L3.24 6.15z"/></svg>
+        <span>Radio</span>
+      </div>
+    </div>
+
     <button class="src-tab bluetooth" id="tabBluetooth" onclick="switchSource('BLUETOOTH','')">
+      <!-- Bluetooth icon -->
       <svg viewBox="0 0 24 24"><path d="M17.71 7.71 12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
-      <span>BT</span>
+      <span>Bluetooth</span>
     </button>
+
     <button class="src-tab aux" id="tabAux" onclick="switchSource('AUX','AUX')">
-      <svg viewBox="0 0 24 24"><path d="M19 5h-1V3h-2v2H8V3H6v2H5C3.9 5 3 5.9 3 7v1h18V7c0-1.1-.9-2-2-2zM3 17c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9H3v8zm12-5h2v2h-2v-2zm-4 0h2v2h-2v-2zm-4 0h2v2H7v-2z"/></svg>
+      <!-- 3.5mm jack / line-in icon -->
+      <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18A9 9 0 0 0 12 3zm0 2a7 7 0 0 1 7 7 7 7 0 0 1-7 7 7 7 0 0 1-7-7 7 7 0 0 1 7-7zm0 2a5 5 0 1 0 0 10A5 5 0 0 0 12 7zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm0 1.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>
       <span>AUX</span>
     </button>
-    <button class="src-tab wifi" id="tabWifi" onclick="switchSource('TUNEIN', '')" style="flex:1">
+
+    <button class="src-tab wifi" id="tabWifi" onclick="toggleWifiPopover()">
+      <!-- Wi-Fi icon -->
       <svg viewBox="0 0 24 24"><path d="M1 9l2 2c5.52-5.52 14.48-5.52 20 0l2-2C19.93 3.53 9.07 3.53 1 9zm8 8 3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4 2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
       <span>Wi-Fi</span>
     </button>
+
   </div>
 
 </div>
@@ -639,7 +691,7 @@
       </div>
 
       <!-- Stations -->
-      <div class="drawer-section">
+      <div class="drawer-section" id="stationsSection">
         <span class="drawer-section-label">Radio Stations</span>
 
         <!-- Radio Browser Search -->
@@ -1263,6 +1315,46 @@ async function playRecent(i) {
     });
   } catch {}
 }
+
+
+// ── Wi-Fi source popover ──────────────────────────────────────────────────────
+function toggleWifiPopover() {
+  const pop = document.getElementById('wifiPopover');
+  pop.classList.toggle('open');
+}
+
+function closeWifiPopover() {
+  document.getElementById('wifiPopover')?.classList.remove('open');
+}
+
+function switchSpotify() {
+  closeWifiPopover();
+  // Find the READY Spotify source dynamically from the last broadcast sources
+  const spotify = (allSources || []).find(s => s.source === 'SPOTIFY' && s.status === 'READY');
+  if (spotify) {
+    switchSource('SPOTIFY', spotify.sourceAccount);
+  } else {
+    // Fallback — switch without account, speaker will use default
+    switchSource('SPOTIFY', '');
+  }
+}
+
+function openRadioDrawer() {
+  closeWifiPopover();
+  openDrawer();
+  // Scroll drawer to the stations section
+  setTimeout(() => {
+    const el = document.getElementById('stationsSection');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 150);
+}
+
+// Close popover when clicking outside
+document.addEventListener('click', e => {
+  const pop  = document.getElementById('wifiPopover');
+  const btn  = document.getElementById('tabWifi');
+  if (pop && !pop.contains(e.target) && btn && !btn.contains(e.target)) closeWifiPopover();
+});
 
 // ── Radio Browser Search ─────────────────────────────────────────────────────
 let rbData      = [];
