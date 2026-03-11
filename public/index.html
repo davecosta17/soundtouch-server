@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>SoundTouch</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
@@ -19,23 +19,24 @@
     --shadow:    0 4px 20px rgba(0,0,0,0.35);
   }
 
-  html, body { height: 100%; overflow: hidden; }
+  html, body { height: 100%; overflow: hidden; overflow-x: hidden; }
+  * { max-width: 100%; }
 
   body {
     font-family: 'Barlow', sans-serif;
     background: linear-gradient(180deg, var(--top-dark) 0%, #555 45%, var(--bot-light) 100%);
     display: flex;
     justify-content: center;
-    min-height: 100dvh;
+    min-height: 100svh;
   }
 
   .app {
     width: 100%;
     max-width: 420px;
-    min-height: 100dvh;
+    min-height: 100svh;
     display: flex;
     flex-direction: column;
-    padding: max(env(safe-area-inset-top), 24px) 28px env(safe-area-inset-bottom, 12px);
+    padding: max(env(safe-area-inset-top), clamp(12px, 3vh, 20px)) clamp(16px, 5vw, 28px) max(env(safe-area-inset-bottom), clamp(8px, 2vh, 12px));
   }
 
   /* ── Top Bar ───────────────────────────────────────────────────────────── */
@@ -89,14 +90,14 @@
   /* ── Now Playing ───────────────────────────────────────────────────────── */
   .now-playing-wrap {
     flex: 1; display: flex; align-items: center;
-    justify-content: center; padding: 24px 0 8px;
+    justify-content: center; padding: clamp(10px, 3vh, 24px) 0 clamp(4px, 1vh, 8px);
   }
   .now-playing-card {
     width: 100%;
     border: 2px solid rgba(255,255,255,0.55);
     background: rgba(255,255,255,0.07);
     backdrop-filter: blur(6px);
-    padding: 22px 24px; text-align: center;
+    padding: clamp(12px, 2.5vh, 20px) clamp(14px, 4vw, 24px); text-align: center;
     position: relative; overflow: hidden;
   }
   .now-playing-card::before {
@@ -129,25 +130,11 @@
   }
 
   /* ── Progress bar ──────────────────────────────────────────────────────── */
-  .progress-wrap { margin: 12px 0 2px; visibility: hidden; }
-  .progress-bar-track {
-    height: 3px; background: rgba(30,30,30,0.12); border-radius: 2px; overflow: hidden;
-  }
-  .progress-bar-fill {
-    height: 100%; width: 0%;
-    background: rgba(30,30,30,0.6); border-radius: 2px;
-    transition: width 1s linear;
-  }
-  .progress-time {
-    display: flex; justify-content: flex-end; margin-top: 4px;
-    font-size: 0.68rem; font-weight: 300; letter-spacing: 0.06em;
-    color: rgba(30,30,30,0.45);
-  }
 
   /* ── Source Row ────────────────────────────────────────────────────────── */
   .source-row {
     display: flex; align-items: center; justify-content: center;
-    position: relative; margin: 18px 0 6px;
+    position: relative; margin: clamp(8px, 2vh, 18px) 0 clamp(3px, 1vh, 6px);
   }
   .source-label { font-size: 0.85rem; font-weight: 300; letter-spacing: 0.08em; color: rgba(40,40,40,0.75); }
   .settings-btn {
@@ -161,7 +148,7 @@
   /* ── Transport ─────────────────────────────────────────────────────────── */
   .transport {
     display: flex; align-items: center; justify-content: center;
-    gap: 32px; margin: 10px 0 18px;
+    gap: 32px; margin: clamp(6px, 1.5vh, 10px) 0 clamp(10px, 2.5vh, 18px);
   }
   .btn-skip {
     background: none; border: none; cursor: pointer; padding: 8px;
@@ -169,10 +156,10 @@
     transition: transform 0.12s, opacity 0.12s;
   }
   .btn-skip:active { transform: scale(0.85); opacity: 0.55; }
-  .btn-skip svg { width: 44px; height: 44px; fill: var(--white); filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3)); }
+  .btn-skip svg { width: clamp(36px, 6vh, 44px); height: clamp(36px, 6vh, 44px); fill: var(--white); filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3)); }
 
   .btn-play {
-    width: 78px; height: 78px; border-radius: 50%;
+    width: clamp(62px, 10vh, 78px); height: clamp(62px, 10vh, 78px); border-radius: 50%;
     background: var(--white); border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     box-shadow: var(--shadow); -webkit-tap-highlight-color: transparent;
@@ -182,7 +169,7 @@
   .btn-play svg { width: 30px; height: 30px; fill: #222; margin-left: 3px; }
 
   /* ── Volume ────────────────────────────────────────────────────────────── */
-  .volume-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .volume-row { display: flex; align-items: center; gap: 14px; margin-bottom: clamp(10px, 2.5vh, 20px); padding: 0 4px; }
 
   input[type=range] {
     -webkit-appearance: none; appearance: none; flex: 1; height: 3px;
@@ -202,29 +189,31 @@
 
   /* ── Source Tabs ───────────────────────────────────────────────────────── */
   .source-tabs {
-    display: flex; justify-content: space-around; align-items: center;
+    display: flex; align-items: center;
     background: rgba(200,200,200,0.4); backdrop-filter: blur(8px);
     border-radius: 14px; padding: 10px 0 8px; margin-bottom: 4px;
     position: relative;
   }
   .src-tab {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    background: none; border: none; cursor: pointer; padding: 4px 20px;
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    background: none; border: none; cursor: pointer; padding: 4px 0;
     border-radius: 8px; -webkit-tap-highlight-color: transparent;
     transition: opacity 0.15s, filter 0.15s; opacity: 0.35; position: relative;
   }
   .src-tab.active { opacity: 1; }
   .src-tab svg { width: 26px; height: 26px; fill: #333; transition: fill 0.15s, filter 0.15s; }
+  .src-tab.wifi svg { fill: none; color: #333; }
+  .src-tab.wifi.active svg { fill: none; color: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
   .src-tab.active svg {
-    fill: #b8ff00;
-    filter: drop-shadow(0 0 6px rgba(184,255,0,0.7));
+    fill: #0066ff;
+    filter: drop-shadow(0 0 8px #0044ffcc);
   }
   .src-tab span {
     font-family: 'Barlow Condensed', sans-serif; font-size: 0.65rem;
     font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
     color: #333; transition: color 0.15s;
   }
-  .src-tab.active span { color: #b8ff00; }
+  .src-tab.active span { color: #0066ff; }
 
   /* Wi-Fi popover — positioned relative to source-tabs */
   .wifi-popover {
@@ -326,7 +315,7 @@
   /* ── Art section ─────────────────────────────────────────────────────────── */
   .art-section {
     display: none; flex-direction: column; align-items: center;
-    padding: 12px 0 0; flex: 1;
+    padding: clamp(6px, 1.5vh, 12px) 0 0; flex: 1;
   }
   .app.art-mode .art-section    { display: flex; }
   .app.art-mode .now-playing-wrap { display: none; }
@@ -334,7 +323,7 @@
   .art-img {
     width: 85%;
     max-width: 340px;
-    max-height: 42vh;
+    max-height: clamp(160px, 38vh, 340px);
     aspect-ratio: 1 / 1;
     object-fit: cover;
     border-radius: 10px;
@@ -363,9 +352,6 @@
   /* ── Art-mode: adapt bottom controls to dark background ─────────────────── */
   .app.art-mode .source-label          { color: rgba(255,255,255,0.75); }
   .app.art-mode .settings-btn svg      { fill: rgba(255,255,255,0.7); }
-  .app.art-mode .progress-time         { color: rgba(255,255,255,0.5); }
-  .app.art-mode .progress-bar-track    { background: rgba(255,255,255,0.2); }
-  .app.art-mode .progress-bar-fill     { background: rgba(255,255,255,0.8); }
   .app.art-mode input[type=range] {
     background: linear-gradient(to right, rgba(255,255,255,0.75) var(--pct,10%), rgba(255,255,255,0.2) var(--pct,10%));
   }
@@ -375,8 +361,10 @@
   }
   .app.art-mode .src-tab span          { color: rgba(255,255,255,0.55); }
   .app.art-mode .src-tab svg           { fill: rgba(255,255,255,0.55); }
-  .app.art-mode .src-tab.active svg    { fill: #b8ff00; filter: drop-shadow(0 0 6px rgba(184,255,0,0.7)); }
-  .app.art-mode .src-tab.active span   { color: #b8ff00; }
+  .app.art-mode .src-tab.wifi svg      { fill: none; color: rgba(255,255,255,0.55); }
+  .app.art-mode .src-tab.wifi.active svg { fill: none; color: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
+  .app.art-mode .src-tab.active svg    { fill: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
+  .app.art-mode .src-tab.active span   { color: #0066ff; }
   .app.art-mode .btn-skip svg          { filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
 
   /* ── Shared list styles (drawer content) ────────────────────────────────── */
@@ -607,10 +595,6 @@
   </div>
 
   <!-- Progress bar & elapsed timer -->
-  <div class="progress-wrap" id="progressWrap">
-    <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill"></div></div>
-    <div class="progress-time"><span id="elapsedTime">0:00</span></div>
-  </div>
 
   <!-- Transport -->
   <div class="transport">
@@ -628,7 +612,7 @@
 
   <!-- Volume -->
   <div class="volume-row">
-    <button class="mute-btn icon-btn" id="muteBtn" title="Mute" onclick="toggleMute()">
+    <button class="mute-btn icon-btn" id="muteBtn" title="Mute" onclick="toggleMute()" style="flex-shrink:0">
       <svg id="iconMuteOff" viewBox="0 0 24 24"><path d="M18.5 12A4.5 4.5 0 0 0 16 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5zm7-.17v6.34L9.83 13H7v-2h2.83L12 8.83z"/></svg>
       <svg id="iconMuteOn"  viewBox="0 0 24 24" style="display:none"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06A8.99 8.99 0 0 0 17.73 18l2 2L21 18.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
     </button>
@@ -664,8 +648,12 @@
     </button>
 
     <button class="src-tab wifi" id="tabWifi" onclick="toggleWifiPopover()">
-      <!-- Wi-Fi icon -->
-      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c5.52-5.52 14.48-5.52 20 0l2-2C19.93 3.53 9.07 3.53 1 9zm8 8 3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4 2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none"/>
+        <path d="M8.5 16.5a5 5 0 0 1 7 0"/>
+        <path d="M4.5 12.5a11 11 0 0 1 15 0"/>
+        <path d="M1 8.5a17 17 0 0 1 22 0"/>
+      </svg>
       <span>Wi-Fi</span>
     </button>
 
@@ -686,7 +674,10 @@
 
       <!-- Recents -->
       <div class="drawer-section">
-        <span class="drawer-section-label">Recently Played</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span class="drawer-section-label" style="margin-bottom:0">Recently Played</span>
+          <button onclick="clearRecents()" style="background:none;border:none;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.3);padding:4px 0;-webkit-tap-highlight-color:transparent" id="clearRecentsBtn">Clear</button>
+        </div>
         <ul class="sheet-list" id="recentList"><li><span class="item-name" style="color:rgba(255,255,255,0.3)">Loading…</span></li></ul>
       </div>
 
@@ -792,52 +783,7 @@ function updateArtInfo(s) {
 }
 
 // ── Playback timer ────────────────────────────────────────────────────────────
-let timerInterval = null;
-let timerSeconds  = 0;
-let lastTrackKey  = null;
 
-function updateTimer(s) {
-  const trackKey = s.track || s.stationName || null;
-  const playing  = s.status === 'PLAY_STATE';
-  const wrap     = document.getElementById('progressWrap');
-  const fill     = document.getElementById('progressFill');
-  const timeEl   = document.getElementById('elapsedTime');
-
-  // Reset counter when track changes
-  if (trackKey && trackKey !== lastTrackKey) {
-    timerSeconds = 0;
-    lastTrackKey = trackKey;
-    fill.style.transition = 'none';
-    fill.style.width = '0%';
-    timeEl.textContent = '0:00';
-    setTimeout(() => { fill.style.transition = 'width 1s linear'; }, 50);
-  }
-
-  if (playing && !timerInterval) {
-    wrap.style.visibility = 'visible';
-    timerInterval = setInterval(() => {
-      timerSeconds++;
-      const m = Math.floor(timerSeconds / 60);
-      const sec = String(timerSeconds % 60).padStart(2, '0');
-      timeEl.textContent = m + ':' + sec;
-      // Bar fills over 5 minutes; stays full after that
-      fill.style.width = Math.min(timerSeconds / 300 * 100, 100) + '%';
-    }, 1000);
-  } else if (!playing && timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
-
-  if (!trackKey || s.status === 'STOP_STATE') {
-    clearInterval(timerInterval);
-    timerInterval = null;
-    timerSeconds  = 0;
-    lastTrackKey  = null;
-    wrap.style.visibility = 'hidden';
-    fill.style.width = '0%';
-    timeEl.textContent = '0:00';
-  }
-}
 
 // ── WebSocket ────────────────────────────────────────────────────────────────
 function connectWS() {
@@ -903,7 +849,6 @@ function applyStatus(s) {
     albumEl.textContent  = '';
   }
 
-  updateTimer(s);
 
   // Album art — switch layouts if art availability changed
   const artUrl = s.artUrl || null;
@@ -934,6 +879,13 @@ function applyStatus(s) {
 
   if (document.activeElement !== document.getElementById('volumeSlider'))
     setSliderValue(Number(s.volume));
+
+  // Sync mute icon to actual speaker state
+  if (typeof s.muted === 'boolean') {
+    isMuted = s.muted;
+    document.getElementById('iconMuteOff').style.display = isMuted ? 'none' : '';
+    document.getElementById('iconMuteOn').style.display  = isMuted ? '' : 'none';
+  }
 
   // Refresh source list badges if panel open
   refreshSourceBadges();
@@ -1274,7 +1226,9 @@ let cachedRecents = [];
 
 function renderRecents(recents) {
   cachedRecents = recents;
-  const list = document.getElementById('recentList');
+  const list    = document.getElementById('recentList');
+  const clearBtn = document.getElementById('clearRecentsBtn');
+  if (clearBtn) clearBtn.style.display = recents.length ? '' : 'none';
   if (!recents.length) {
     list.innerHTML = '<li><span class="item-name" style="color:rgba(255,255,255,0.3)">Nothing played yet</span></li>';
     return;
@@ -1292,6 +1246,13 @@ function renderRecents(recents) {
       <div class="item-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
     </li>`;
   }).join('');
+}
+
+async function clearRecents() {
+  // Speaker has no API to clear recents — just wipe the UI
+  cachedRecents = [];
+  renderRecents([]);
+  document.getElementById('clearRecentsBtn').style.display = 'none';
 }
 
 async function loadRecents() {

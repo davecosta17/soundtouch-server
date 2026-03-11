@@ -325,14 +325,14 @@ async function getRecents() {
     const items = [];
     const re = /<recent[^>]*>.*?<contentItem\s([^>]*)>(.*?)<\/contentItem>.*?<\/recent>/gis;
     let m;
-    while ((m = re.exec(r.data)) !== null && items.length < 10) {
+    while ((m = re.exec(r.data)) !== null && items.length < 5) {
         const a = n => { const x = m[1].match(new RegExp(`${n}="([^"]*)"`)); return x ? x[1] : ''; };
         items.push({
             source:        a('source'),
             location:      a('location'),
             sourceAccount: a('sourceAccount'),
             isPresetable:  a('isPresetable') === 'true',
-            itemName:      m[2].replace(/<[^>]+>/g, '').trim()
+            itemName:      decodeXmlEntities(m[2].replace(/<[^>]+>/g, '').trim())
         });
     }
     return items;
@@ -353,10 +353,18 @@ async function sendKey(key) {
     await axios.post(url, `<key state="release" sender="Gabbo">${key}</key>`, XML_H);
 }
 
+function decodeXmlEntities(s) {
+    return s.replace(/&apos;/g, "'")
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g,  '&')
+            .replace(/&lt;/g,   '<')
+            .replace(/&gt;/g,   '>');
+}
+
 function ex(xml, tag) {
     // (?=[\s>/]) ensures tag name ends at a boundary, so <art> won't match <artist>
     const m = xml.match(new RegExp(`<${tag}(?=[\\s>/])[^>]*>(.*?)<\\/${tag}>`, 's'));
-    return m ? m[1].trim() : '';
+    return m ? decodeXmlEntities(m[1].trim()) : '';
 }
 function attr(xml, tag, a) {
     const m = xml.match(new RegExp(`<${tag}[^>]*\\s${a}="([^"]*)"`));
@@ -370,8 +378,9 @@ function parseStatus(nowXml, volXml) {
     const status      = ex(nowXml, 'playStatus');
     const stationName = ex(nowXml, 'stationName');
 
-    const volM  = volXml.match(/<actualvolume>(.*?)<\/actualvolume>/);
-    const volume = volM ? Number(volM[1]) : 0;
+    const volM    = volXml.match(/<actualvolume>(.*?)<\/actualvolume>/);
+    const volume  = volM ? Number(volM[1]) : 0;
+    const muted   = volXml.includes('<muteenabled>true</muteenabled>');
 
     // Extract Bluetooth device name — attribute order varies, so search the whole ContentItem tag
     let bluetoothDevice = null;
@@ -392,7 +401,7 @@ function parseStatus(nowXml, volXml) {
     const artStatusM = nowXml.match(/artImageStatus="([^"]*)"/);
     const artUrl = (artStatusM && artStatusM[1] === 'IMAGE_PRESENT') ? ex(nowXml, 'art') : null;
 
-    return { source, wifiType, track, artist, album, stationName, bluetoothDevice, artUrl, status, volume };
+    return { source, wifiType, track, artist, album, stationName, bluetoothDevice, artUrl, status, volume, muted };
 }
 
 async function getStatus() {
