@@ -1,5 +1,7 @@
 # SoundTouch Local Server
 
+> **Disclaimer:** This is an unofficial personal project and is not affiliated with, endorsed by, or in any way associated with Bose Corporation. SoundTouch and Bose are trademarks of Bose Corporation. This tool is intended for personal use only to control your own speaker on your own network.
+
 A self-hosted Node.js server that replaces Bose's cloud dependency for SoundTouch speakers. Built ahead of Bose's cloud shutdown, it gives you full local control over your speaker from any browser on your network — no Bose account, no internet connection required.
 
 ---
@@ -30,7 +32,7 @@ The Bose SoundTouch Web API runs entirely over your local network on port 8090. 
 - Switch between Bluetooth, AUX, and Wi-Fi sources
 - Browse and play recently played content
 - Add and manage internet radio stations
-- Search and play stations from TuneIn's directory
+- Search and play stations from Radio Browser's open directory (30,000+ stations)
 - Album art display with dynamic background colour (Spotify, radio)
 - Bass, treble, and DSP equaliser controls (capability-dependent)
 - Rename the speaker
@@ -184,11 +186,11 @@ Tap the hamburger icon (top left) to open the slide-in drawer. It contains four 
 
 **Radio Stations** — search TuneIn's directory and manage your saved stations.
 
-A search bar at the top lets you search TuneIn's directory. Results show the station name, bitrate, and a short description. Tap a result to reveal two options:
+A search bar at the top lets you search Radio Browser's open directory of 30,000+ stations. Results are sorted by popularity and only include stations verified as online. Each result shows the station logo, name, country, codec, and bitrate. Tap a result to reveal two options:
 - **▶ Play Now** — plays the station immediately and closes the drawer
-- **+ Save** — adds the station to your saved list permanently
+- **+ Save** — adds the station to your saved list permanently, including its logo
 
-Below the search results are your saved stations. Tap a station to play it. Use the × button to remove a station. Add new stations using the form at the bottom — enter a name and a direct stream URL (must be an `http://` or `https://` stream, not a playlist page).
+Below the search results are your saved stations, each showing its logo if available. Tap a station to play it. Use the × button to remove a station. Add new stations using the form at the bottom — enter a name and a direct stream URL (must be an `http://` or `https://` stream, not a playlist page).
 
 **Sources** — all sources the speaker reports, with their current status (Ready / Unavailable). Tap a Ready source to switch to it. The active source is highlighted.
 
@@ -299,11 +301,14 @@ All endpoints are on port 3000. Successful responses return HTTP 200; errors ret
 | `/radio/:id` | GET | — | Play station by index |
 | `/station-data/:id` | GET | — | Station metadata (used by speaker internally) |
 
-### TuneIn
+### Radio Browser
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/tunein/search?q=...` | GET | Search TuneIn directory, returns top 10 resolved stations as `[{ name, streamUrl, bitrate, reliability, subtitle }]` |
+| `/radio-browser/search?q=...` | GET | Search Radio Browser directory — returns top 10 live-verified stations sorted by popularity as `[{ name, streamUrl, bitrate, codec, country, language, tags, favicon, stationuuid }]` |
+| `/radio-browser/play` | POST | `{ streamUrl, name }` — plays a Radio Browser station, proxying HTTPS streams if needed |
+| `/radio/stream-proxy?url=...` | GET | Pipes an HTTPS audio stream over HTTP — required because SoundTouch firmware cannot connect to HTTPS audio directly |
+| `/radio/stream-data?url=...&name=...` | GET | Metadata endpoint the speaker fetches to get the stream URL — same contract as `/station-data/:id` |
 
 ### Art Proxy
 
@@ -353,7 +358,9 @@ Open `http://localhost:3000/status` and check the `artUrl` field. If it is `null
 
 **Radio stations not playing**
 
-The stream URL must be a direct audio stream, not a website or playlist page. URLs ending in `.mp3`, `.aac`, `.ogg`, or with `/stream` in the path typically work. The speaker connects to the stream directly, so the URL must be accessible from the speaker's network, not just the server's.
+For manually added stations, the URL must be a direct audio stream — not a website or playlist page. URLs ending in `.mp3`, `.aac`, `.ogg`, or containing `/stream` typically work.
+
+For Radio Browser results, streams are pre-verified as online, but the speaker connects to them directly (or via the HTTPS proxy) so the stream must be reachable from your local network. If a station buffers indefinitely, try a different result for the same station — Radio Browser often lists multiple stream URLs per station at different bitrates.
 
 **EQ controls not showing**
 
