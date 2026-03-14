@@ -1,7 +1,7 @@
 {
-  "name": "SoundTouch",
-  "short_name": "SoundTouch",
-  "description": "Local Bose SoundTouch controller",
+  "name": "Speaker Remote",
+  "short_name": "Speaker Remote",
+  "description": "Local controller for Bose SoundTouch speakers",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
