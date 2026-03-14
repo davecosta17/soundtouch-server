@@ -16,6 +16,7 @@ app.use(express.static('public'));
 const IP_CACHE = './speaker-cache.json';
 
 let speakerIp   = null;
+let wsFailCount  = 0;  // consecutive WS connection failures
 let speakerName = null;
 let discovered  = false;
 
@@ -31,14 +32,47 @@ function setSpeaker(ip, name) {
 
     if (!discovered) {
         discovered = true;
-        console.log(`[Discovery] Speaker "${speakerName}" found at ${speakerIp}`);
+        console.log(`[Discovery] ✓ Speaker "${speakerName}" found at ${speakerIp}`);
         saveCache(speakerIp, speakerName);
-        onDiscovered();   // ← fires exactly once, cleanly separated
+        onDiscovered();
     } else if (ipChanged) {
-        console.log(`[Discovery] Speaker IP changed to ${speakerIp}`);
+        console.log(`[Discovery] Speaker IP changed: ${speakerIp} → ${ip}`);
         saveCache(speakerIp, speakerName);
-        onIpChanged();    // ← only reconnects the speaker WS
+        onIpChanged();
+    } else {
+        // Same IP — just log a heartbeat confirmation when rediscovering
+        if (!speakerWsReady) console.log(`[Discovery] Speaker still at ${speakerIp} — reconnecting WS`);
     }
+}
+
+// ── Restart discovery after network drop ──────────────────────────────────────
+// Called when the speaker WS fails repeatedly — resets state and re-runs
+// the full discovery pipeline (mDNS fast queries + subnet scan fallback).
+function restartDiscovery() {
+    console.log('[Discovery] ━━━ Network drop detected — restarting discovery ━━━');
+    discovered     = false;
+    wsFailCount    = 0;
+    httpFailCount  = 0;
+    speakerWsReady = false;
+
+    // Resume fast mDNS queries every 5s
+    console.log('[Discovery] Step 1 — querying mDNS every 5s…');
+    const rediscoverInterval = setInterval(() => {
+        queryMdns();
+        if (discovered) {
+            clearInterval(rediscoverInterval);
+            console.log('[Discovery] ✓ Speaker re-found — resuming normal operation');
+        }
+    }, 5_000);
+    queryMdns(); // immediate query
+
+    // Subnet scan fallback after 8s
+    setTimeout(() => {
+        if (!discovered) {
+            console.log('[Discovery] Step 2 — mDNS silent, falling back to subnet scan…');
+            scanAllSubnets();
+        }
+    }, 8_000);
 }
 
 // ── Load & validate cached IP ─────────────────────────────────────────────────
@@ -76,6 +110,7 @@ function queryMdns() {
     if (!discovered) console.log('[mDNS] Querying for _soundtouch._tcp.local…');
     mcast.query({ questions: [{ name: '_soundtouch._tcp.local', type: 'PTR' }] });
 }
+
 
 // Query immediately, retry every 5s until found, then slow heartbeat every 30s
 queryMdns();
@@ -209,8 +244,9 @@ function connectSpeakerWs() {
     speakerWs = ws;
 
     ws.on('open', () => {
-        console.log('[SpeakerWS] Connected');
+        console.log(`[SpeakerWS] Connected to ${target} ✓`);
         speakerWsReady = true;
+        wsFailCount = 0;
     });
 
     ws.on('message', async data => {
@@ -243,23 +279,49 @@ function connectSpeakerWs() {
     });
 
     ws.on('error', err => {
-        // Log but don't rethrow — the 'close' event will handle retry
-        console.error('[SpeakerWS] Error:', err.message);
         speakerWsReady = false;
+        wsFailCount++;
+        console.error(`[SpeakerWS] Error (${wsFailCount}/3): ${err.message}`);
+        if (wsFailCount >= 3) {
+            console.log('[SpeakerWS] 3 consecutive failures — triggering rediscovery');
+            restartDiscovery();
+        }
     });
 
     ws.on('close', () => {
         speakerWsReady = false;
         if (speakerWsTarget !== target) return; // IP changed, new socket already created
-        console.log('[SpeakerWS] Disconnected — retrying in 10s');
+        console.log(`[SpeakerWS] Disconnected (fail streak: ${wsFailCount}) — retrying in 10s`);
         setTimeout(() => {
-            if (speakerIp && speakerWsTarget === target) connectSpeakerWs();
+            if (speakerIp && speakerWsTarget === target) {
+                console.log('[SpeakerWS] Attempting reconnect…');
+                connectSpeakerWs();
+            }
         }, 10_000);
     });
 }
 
+let httpFailCount = 0;
+
 // Fallback poll: fires if speaker WS is down, and a slow heartbeat even when up
-setInterval(() => { if (!speakerWsReady) broadcastStatus(); }, 3_000);
+setInterval(async () => {
+    if (!speakerWsReady) {
+        try {
+            await broadcastStatus();
+            if (httpFailCount > 0) {
+                console.log(`[Poll] Speaker responded — resetting HTTP fail count (was ${httpFailCount})`);
+                httpFailCount = 0;
+            }
+        } catch {
+            httpFailCount++;
+            console.warn(`[Poll] HTTP poll failed (${httpFailCount}/5) — speaker unreachable`);
+            if (httpFailCount >= 5 && discovered) {
+                console.log('[Poll] 5 consecutive HTTP failures — triggering rediscovery');
+                restartDiscovery();
+            }
+        }
+    }
+}, 3_000);
 setInterval(broadcastStatus, 15_000);
 
 
