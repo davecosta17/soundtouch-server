@@ -1,8 +1,55 @@
-const express = require('express');
-const axios = require('axios');
+require('dotenv').config();
+const express  = require('express');
+const axios    = require('axios');
 const WebSocket = require('ws');
-const mdns = require('multicast-dns');
-const fs = require('fs');
+const mdns     = require('multicast-dns');
+const fs       = require('fs');
+
+// ─── Spotify OAuth config ─────────────────────────────────────────────────────
+const SP_CLIENT_ID     = process.env.SPOTIFY_CLIENT_ID     || '';
+const SP_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
+const SP_REDIRECT_URI  = process.env.SPOTIFY_REDIRECT_URI  || 'http://localhost:3000/spotify/callback';
+const SP_TOKEN_FILE    = './spotify-tokens.json';
+const SP_SCOPES        = 'user-read-playback-state user-modify-playback-state';
+
+let spTokens = null; // { access_token, refresh_token, expires_at }
+try {
+    if (fs.existsSync(SP_TOKEN_FILE))
+        spTokens = JSON.parse(fs.readFileSync(SP_TOKEN_FILE, 'utf8'));
+} catch {}
+
+function saveSpTokens(t) {
+    spTokens = t;
+    fs.writeFileSync(SP_TOKEN_FILE, JSON.stringify(t, null, 2));
+}
+
+async function getSpAccessToken() {
+    if (!spTokens) return null;
+    if (Date.now() < spTokens.expires_at - 60_000) return spTokens.access_token;
+    // Refresh
+    try {
+        const r = await axios.post('https://accounts.spotify.com/api/token',
+            new URLSearchParams({
+                grant_type: 'refresh_token',
+                refresh_token: spTokens.refresh_token,
+            }), {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Authorization': 'Basic ' + Buffer.from(SP_CLIENT_ID + ':' + SP_CLIENT_SECRET).toString('base64'),
+                }
+            });
+        saveSpTokens({
+            access_token:  r.data.access_token,
+            refresh_token: r.data.refresh_token || spTokens.refresh_token,
+            expires_at:    Date.now() + r.data.expires_in * 1000,
+        });
+        console.log('[Spotify] Token refreshed');
+        return spTokens.access_token;
+    } catch (err) {
+        console.error('[Spotify] Token refresh failed:', err.message);
+        return null;
+    }
+}
 
 const app = express();
 app.use(express.json());
@@ -370,8 +417,21 @@ function broadcast(payload) {
     });
 }
 
+// Called from broadcastStatus — start or stop Spotify poller based on active source
+function syncSpotifyPoller(status) {
+    if (status && status.wifiType === 'spotify' && status.status === 'PLAY_STATE') {
+        startSpotifyPoller();
+    } else {
+        stopSpotifyPoller();
+    }
+}
+
 async function broadcastStatus() {
-    try { broadcast({ type: 'status', ...await getStatus() }); } catch {}
+    try {
+        const status = await getStatus();
+        broadcast({ type: 'status', ...status });
+        syncSpotifyPoller(status);
+    } catch {}
 }
 
 async function broadcastEq() {
@@ -445,11 +505,17 @@ function parseStatus(nowXml, volXml) {
     const muted   = volXml.includes('<muteenabled>true</muteenabled>');
 
     // Extract Bluetooth device name — attribute order varies, so search the whole ContentItem tag
+    // Speaker puts BT device name in stationName, with sourceAccount as fallback
     let bluetoothDevice = null;
-    const btTagMatch = nowXml.match(/<ContentItem[^>]*source="BLUETOOTH"[^>]*>/);
-    if (btTagMatch) {
-        const acctMatch = btTagMatch[0].match(/sourceAccount="([^"]+)"/);
-        if (acctMatch && acctMatch[1]) bluetoothDevice = acctMatch[1];
+    if (nowXml.includes('source="BLUETOOTH"')) {
+        bluetoothDevice = stationName || null;
+        if (!bluetoothDevice) {
+            const btTagMatch = nowXml.match(/<ContentItem[^>]*source="BLUETOOTH"[^>]*>/);
+            if (btTagMatch) {
+                const acctMatch = btTagMatch[0].match(/sourceAccount="([^"]+)"/);
+                if (acctMatch && acctMatch[1]) bluetoothDevice = acctMatch[1];
+            }
+        }
     }
 
     let source = 'unknown', wifiType = null;
@@ -538,6 +604,15 @@ const keyRoute = (key, msg) => async (req, res) => {
 };
 
 app.get('/power',     keyRoute('POWER',      'Power toggled'));
+
+// Put speaker into Bluetooth pairing/discovery mode
+app.get('/bluetooth-discover', async (req, res) => {
+    try {
+        await sendKey('BLUETOOTH');
+        res.send('Discovering');
+    } catch (err) { res.status(502).send('Error'); }
+});
+
 app.get('/mute', async (req, res) => {
     try {
         const volRes = await axios.get(`${speakerUrl()}/volume`, { timeout: 3000 });
@@ -916,6 +991,110 @@ app.get('/radio/:id', async (req, res) => {
     } catch (err) { res.status(502).send('Radio Error'); }
 });
 
+
+
+// ─── Spotify OAuth & Progress ─────────────────────────────────────────────────
+
+app.get('/spotify/login', (req, res) => {
+    if (!SP_CLIENT_ID) return res.status(500).send('SPOTIFY_CLIENT_ID not set in .env');
+    const params = new URLSearchParams({
+        response_type: 'code',
+        client_id:     SP_CLIENT_ID,
+        scope:         SP_SCOPES,
+        redirect_uri:  SP_REDIRECT_URI,
+    });
+    res.redirect('https://accounts.spotify.com/authorize?' + params);
+});
+
+app.get('/spotify/callback', async (req, res) => {
+    const code = req.query.code;
+    if (!code) return res.status(400).send('No code returned from Spotify');
+    try {
+        const r = await axios.post('https://accounts.spotify.com/api/token',
+            new URLSearchParams({
+                grant_type:   'authorization_code',
+                code,
+                redirect_uri: SP_REDIRECT_URI,
+            }), {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Authorization': 'Basic ' + Buffer.from(SP_CLIENT_ID + ':' + SP_CLIENT_SECRET).toString('base64'),
+                }
+            });
+        saveSpTokens({
+            access_token:  r.data.access_token,
+            refresh_token: r.data.refresh_token,
+            expires_at:    Date.now() + r.data.expires_in * 1000,
+        });
+        console.log('[Spotify] Authorised successfully');
+        res.send('<h2>Spotify connected. You can close this tab.</h2>');
+    } catch (err) {
+        console.error('[Spotify] Auth error:', err.response?.data || err.message);
+        res.status(502).send('Spotify auth failed: ' + (err.response?.data?.error_description || err.message));
+    }
+});
+
+app.get('/spotify/status', (req, res) => {
+    res.json({ connected: !!spTokens, hasClientId: !!SP_CLIENT_ID });
+});
+
+// Seek endpoint — called when user taps the progress bar
+app.post('/spotify/seek', async (req, res) => {
+    const { position_ms } = req.body;
+    if (position_ms === undefined) return res.status(400).send('position_ms required');
+    const token = await getSpAccessToken();
+    if (!token) return res.status(401).send('Not authenticated with Spotify');
+    try {
+        await axios.put(`https://api.spotify.com/v1/me/player/seek?position_ms=${Math.round(position_ms)}`, {}, {
+            headers: { Authorization: 'Bearer ' + token }
+        });
+        res.send('OK');
+    } catch (err) {
+        console.error('[Spotify/seek]', err.response?.data || err.message);
+        res.status(502).send('Seek failed');
+    }
+});
+
+// ── Spotify progress poller ───────────────────────────────────────────────────
+let spPollInterval = null;
+
+function startSpotifyPoller() {
+    if (spPollInterval) return;
+    console.log('[Spotify] Starting progress poller');
+    spPollInterval = setInterval(pollSpotifyProgress, 2000);
+}
+
+function stopSpotifyPoller() {
+    if (!spPollInterval) return;
+    console.log('[Spotify] Stopping progress poller');
+    clearInterval(spPollInterval);
+    spPollInterval = null;
+    // Send a clear event so UI hides the bar
+    broadcast({ type: 'progress', progress_ms: 0, duration_ms: 0, is_playing: false, clear: true });
+}
+
+async function pollSpotifyProgress() {
+    const token = await getSpAccessToken();
+    if (!token) return;
+    try {
+        const r = await axios.get('https://api.spotify.com/v1/me/player', {
+            headers: { Authorization: 'Bearer ' + token },
+            timeout: 3000,
+        });
+        if (r.status === 204 || !r.data) return; // Nothing playing
+        const { progress_ms, duration_ms, is_playing, item } = r.data;
+        broadcast({
+            type:        'progress',
+            progress_ms: progress_ms || 0,
+            duration_ms: item?.duration_ms || duration_ms || 0,
+            is_playing,
+        });
+    } catch (err) {
+        if (err.response?.status === 401) {
+            console.warn('[Spotify] Token expired mid-poll');
+        }
+    }
+}
 
 // ─── HTTP + WebSocket server ───────────────────────────────────────────────────
 

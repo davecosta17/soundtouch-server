@@ -62,6 +62,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   .icon-btn:active { transform: scale(0.88); opacity: 0.6; }
+  #btnPower.on svg { fill: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
   .icon-btn svg { width: 28px; height: 28px; fill: var(--white); }
 
   .speaker-name {
@@ -194,6 +195,31 @@
     background: #2a2a2a; border: none; cursor: pointer;
   }
 
+
+  /* ── Spotify Progress Bar ──────────────────────────────────────────────── */
+  .sp-progress-wrap {
+    display: none; flex-direction: column; gap: 5px;
+    margin: 10px 0 4px; padding: 0 2px;
+  }
+  .sp-progress-wrap.visible { display: flex; }
+  .sp-bar-row {
+    position: relative; height: 3px; background: rgba(0,0,0,0.18);
+    border-radius: 2px; cursor: pointer;
+  }
+  .app.art-mode .sp-bar-row { background: rgba(255,255,255,0.2); }
+  .sp-bar-fill {
+    height: 100%; border-radius: 2px;
+    background: #0066ff; width: 0%;
+    transition: width 1s linear;
+    pointer-events: none;
+  }
+  .sp-bar-row:active .sp-bar-fill { transition: none; }
+  .sp-time-row {
+    display: flex; justify-content: space-between;
+    font-family: 'Barlow', sans-serif; font-size: 0.68rem;
+    color: rgba(30,30,30,0.5); letter-spacing: 0.02em;
+  }
+  .app.art-mode .sp-time-row { color: rgba(255,255,255,0.45); }
   /* ── Source Tabs ───────────────────────────────────────────────────────── */
   .source-tabs {
     display: flex; align-items: center;
@@ -571,7 +597,7 @@
       </div>
       <div class="status-line" id="statusLine">Connecting…</div>
     </div>
-    <button class="icon-btn" title="Power" onclick="api('power')">
+    <button class="icon-btn" id="btnPower" title="Power" onclick="api('power')">
       <svg viewBox="0 0 24 24"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42A6.92 6.92 0 0 1 19 12c0 3.87-3.13 7-7 7A7 7 0 0 1 5 12c0-2.28 1.09-4.3 2.58-5.42L6.17 5.17A8.932 8.932 0 0 0 3 12a9 9 0 0 0 18 0c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
     </button>
   </div>
@@ -596,13 +622,21 @@
     </div>
   </div>
 
-  <!-- Source Row -->
-  <div class="source-row">
+  <!-- Source Row / Progress Bar — mutually exclusive -->
+  <div class="source-row" id="sourceRow">
     <span class="source-label" id="sourceLabel">Source</span>
+  </div>
+  <div class="sp-progress-wrap" id="spProgressWrap">
+    <div class="sp-bar-row" id="spBarRow" onclick="spSeek(event)">
+      <div class="sp-bar-fill" id="spBarFill"></div>
+    </div>
+    <div class="sp-time-row">
+      <span id="spElapsed">0:00</span>
+      <span id="spDuration">0:00</span>
+    </div>
   </div>
 
   <!-- Progress bar & elapsed timer -->
-
   <!-- Transport -->
   <div class="transport">
     <button class="btn-skip" title="Previous" onclick="api('prev')">
@@ -642,7 +676,7 @@
       </div>
     </div>
 
-    <button class="src-tab bluetooth" id="tabBluetooth" onclick="switchSource('BLUETOOTH','')">
+    <button class="src-tab bluetooth" id="tabBluetooth" onclick="handleBluetoothTab()">
       <!-- Bluetooth icon -->
       <svg viewBox="0 0 24 24"><path d="M17.71 7.71 12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
       <span>Bluetooth</span>
@@ -800,6 +834,7 @@ function connectWS() {
     try {
       const msg = JSON.parse(e.data);
       if      (msg.type === 'status')  applyStatus(msg);
+      else if (msg.type === 'progress') applyProgress(msg);
       else if (msg.type === 'eq')      applyEq(msg);
       else if (msg.type === 'sources') { allSources = msg.sources; refreshSourceBadges(); }
       else if (msg.type === 'info')    { document.getElementById('speakerName').textContent = msg.name.toUpperCase(); }
@@ -850,6 +885,10 @@ function applyStatus(s) {
     trackEl.textContent  = s.track  || '';
     artistEl.textContent = s.artist || '';
     albumEl.textContent  = s.album  || '';
+  } else if (s.source === 'bluetooth' && s.bluetoothDevice) {
+    trackEl.textContent  = s.bluetoothDevice;
+    artistEl.textContent = 'Connected via Bluetooth';
+    albumEl.textContent  = '';
   } else {
     trackEl.innerHTML    = '<span class="np-idle">—</span>';
     artistEl.textContent = '';
@@ -879,6 +918,12 @@ function applyStatus(s) {
   };
   document.getElementById('sourceLabel').textContent = srcLabels[s.source] ?? 'Source';
   currentSource = s.source;
+
+  // Power button illuminates when speaker is active (not standby)
+  document.getElementById('btnPower').classList.toggle('on', s.source !== 'unknown');
+
+  // Hide progress bar if no longer on Spotify
+  if (!(s.source === 'wifi' && s.wifiType === 'spotify')) hideProgress();
 
   document.getElementById('tabBluetooth').classList.toggle('active', s.source === 'bluetooth');
   document.getElementById('tabAux').classList.toggle('active',       s.source === 'aux');
@@ -998,6 +1043,15 @@ async function api(endpoint) {
 }
 
 function togglePlay() { api(isPlaying ? 'pause' : 'play'); }
+
+function handleBluetoothTab() {
+  if (currentSource === 'bluetooth') {
+    // Already on Bluetooth — put speaker into pairing/discovery mode
+    fetch('/bluetooth-discover').catch(() => {});
+  } else {
+    switchSource('BLUETOOTH', '');
+  }
+}
 
 async function switchSource(source, sourceAccount) {
   try {
@@ -1284,6 +1338,79 @@ async function playRecent(i) {
   } catch {}
 }
 
+
+
+// ── Spotify Progress Bar ──────────────────────────────────────────────────────
+let spDurationMs  = 0;
+let spProgressMs  = 0;
+let spIsPlaying   = false;
+let spTickInterval = null;
+
+function fmtMs(ms) {
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+function applyProgress(msg) {
+  if (msg.clear) {
+    hideProgress();
+    return;
+  }
+  spProgressMs  = msg.progress_ms  || 0;
+  spDurationMs  = msg.duration_ms  || 0;
+  spIsPlaying   = msg.is_playing   || false;
+
+  document.getElementById('spProgressWrap').classList.add('visible');
+  document.getElementById('sourceRow').style.display = 'none';
+  renderProgress();
+
+  // Tick locally each second while playing so bar moves smoothly
+  clearInterval(spTickInterval);
+  if (spIsPlaying) {
+    spTickInterval = setInterval(() => {
+      spProgressMs = Math.min(spProgressMs + 1000, spDurationMs);
+      renderProgress();
+    }, 1000);
+  }
+}
+
+function renderProgress() {
+  const pct = spDurationMs > 0 ? (spProgressMs / spDurationMs) * 100 : 0;
+  document.getElementById('spBarFill').style.width  = pct.toFixed(2) + '%';
+  document.getElementById('spElapsed').textContent  = fmtMs(spProgressMs);
+  document.getElementById('spDuration').textContent = fmtMs(spDurationMs);
+}
+
+function hideProgress() {
+  clearInterval(spTickInterval);
+  spTickInterval = null;
+  spProgressMs = spDurationMs = 0;
+  document.getElementById('spProgressWrap').classList.remove('visible');
+  document.getElementById('sourceRow').style.display = '';
+}
+
+async function spSeek(e) {
+  if (!spDurationMs) return;
+  const bar  = document.getElementById('spBarRow');
+  const rect = bar.getBoundingClientRect();
+  const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const position_ms = Math.round(pct * spDurationMs);
+  // Update UI immediately
+  document.getElementById('spBarFill').style.transition = 'none';
+  spProgressMs = position_ms;
+  renderProgress();
+  setTimeout(() => {
+    document.getElementById('spBarFill').style.transition = 'width 1s linear';
+  }, 50);
+  // Tell server
+  try {
+    await fetch('/spotify/seek', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ position_ms })
+    });
+  } catch {}
+}
 
 // ── Wi-Fi source popover ──────────────────────────────────────────────────────
 function toggleWifiPopover() {
