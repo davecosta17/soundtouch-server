@@ -1330,11 +1330,30 @@ async function playRecent(i) {
   if (!r) return;
   closeDrawer();
   try {
-    await fetch('/source', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: r.source, sourceAccount: r.sourceAccount, location: r.location })
-    });
+    // Spotify recents need the speaker on Spotify Connect first,
+    // then select the specific track — otherwise the speaker ignores the location URI
+    if (r.source === 'SPOTIFY' && r.location) {
+      const spotify = (allSources || []).find(s => s.source === 'SPOTIFY' && s.status === 'READY');
+      // Switch to Spotify source first
+      await fetch('/source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'SPOTIFY', sourceAccount: spotify?.sourceAccount || r.sourceAccount })
+      });
+      // Wait for Spotify Connect to become active, then select the track
+      await new Promise(r => setTimeout(r, 1500));
+      await fetch('/source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: r.source, sourceAccount: r.sourceAccount, location: r.location })
+      });
+    } else {
+      await fetch('/source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: r.source, sourceAccount: r.sourceAccount, location: r.location })
+      });
+    }
   } catch {}
 }
 

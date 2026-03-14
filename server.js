@@ -608,7 +608,7 @@ app.get('/power',     keyRoute('POWER',      'Power toggled'));
 // Put speaker into Bluetooth pairing/discovery mode
 app.get('/bluetooth-discover', async (req, res) => {
     try {
-        await sendKey('BLUETOOTH');
+        await sendKey('PAIR');
         res.send('Discovering');
     } catch (err) { res.status(502).send('Error'); }
 });
