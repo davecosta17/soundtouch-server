@@ -1,8 +1,8 @@
-# SoundTouch Local Server
+# Speaker Remote
 
 > **Disclaimer:** This is an unofficial personal project and is not affiliated with, endorsed by, or in any way associated with Bose Corporation. SoundTouch and Bose are trademarks of Bose Corporation. This tool is intended for personal use only to control your own speaker on your own network.
 
-A self-hosted Node.js server that replaces Bose's cloud dependency for SoundTouch speakers. Built ahead of Bose's cloud shutdown, it gives you full local control over your speaker from any browser on your network — no Bose account, no internet connection required.
+A self-hosted Node.js server that replaces Bose's cloud dependency for SoundTouch speakers. Built ahead of Bose's cloud shutdown in early 2026, it gives you full local control over your speaker from any browser on your network — no Bose account, no internet connection required for core functionality.
 
 ---
 
@@ -13,13 +13,14 @@ A self-hosted Node.js server that replaces Bose's cloud dependency for SoundTouc
 3. [Project Structure](#project-structure)
 4. [Installation](#installation)
 5. [Configuration](#configuration)
-6. [Running the Server](#running-the-server)
-7. [Using the Web Interface](#using-the-web-interface)
-8. [How Discovery Works](#how-discovery-works)
-9. [How Radio Stations Work](#how-radio-stations-work)
-10. [API Reference](#api-reference)
-11. [WebSocket Events](#websocket-events)
-12. [Troubleshooting](#troubleshooting)
+6. [Spotify Integration](#spotify-integration)
+7. [Running the Server](#running-the-server)
+8. [Using the Web Interface](#using-the-web-interface)
+9. [How Discovery Works](#how-discovery-works)
+10. [How Radio Stations Work](#how-radio-stations-work)
+11. [API Reference](#api-reference)
+12. [WebSocket Events](#websocket-events)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -27,16 +28,30 @@ A self-hosted Node.js server that replaces Bose's cloud dependency for SoundTouc
 
 The Bose SoundTouch Web API runs entirely over your local network on port 8090. This server acts as a bridge between that API and a web-based remote control you can open on any phone, tablet, or computer on the same network.
 
-**Features:**
-- Play, pause, skip, and control volume
-- Switch between Bluetooth, AUX, and Wi-Fi sources
-- Browse and play recently played content
-- Add and manage internet radio stations
-- Search and play stations from Radio Browser's open directory (30,000+ stations)
-- Album art display with dynamic background colour (Spotify, radio)
-- Bass, treble, and DSP equaliser controls (capability-dependent)
-- Rename the speaker
+**Core features:**
+- Play, pause, skip, repeat, shuffle, and control volume
+- Switch between Bluetooth, AUX, and Wi-Fi sources via a tab bar
 - Real-time updates via WebSocket — no polling required
+- Album art display with dynamic background colour extraction
+- Mute state sync, power button illumination, and active source indicator
+- Rename the speaker from the UI
+- Install as a PWA on your home screen (Android and iOS)
+
+**Radio:**
+- Search and play from Radio Browser's open directory of 30,000+ stations with live stream verification
+- Save stations with logos to a local list
+- All radio metadata served locally — no Bose cloud dependency
+
+**Spotify Connect (requires Spotify Developer credentials):**
+- Real-time progress bar with seek support
+- Shuffle and repeat state sync — buttons illuminate to reflect actual state
+- Liked Songs heart icon — tap to like or unlike the current track
+- Queue drawer — view up to 10 upcoming tracks, tap to skip to any of them
+- "Up Next" flyout — slides in from the top 20 seconds before the track ends
+- All Spotify features require a one-time OAuth authorisation (see [Spotify Integration](#spotify-integration))
+
+**EQ (capability-dependent):**
+- Bass, treble, and DSP audio mode controls — only shown when supported by your speaker model
 
 ---
 
@@ -44,7 +59,8 @@ The Bose SoundTouch Web API runs entirely over your local network on port 8090. 
 
 - **Node.js** v18 or later — [nodejs.org](https://nodejs.org)
 - A **Bose SoundTouch** speaker connected to your local Wi-Fi network
-- The server PC must be on the **same network** as the speaker (same router, not a guest network or separate VLAN)
+- The server machine must be on the **same network** as the speaker (same router — not a guest network or separate VLAN)
+- **Spotify Premium** (optional) — required for Spotify Connect features
 
 ---
 
@@ -52,13 +68,23 @@ The Bose SoundTouch Web API runs entirely over your local network on port 8090. 
 
 ```
 soundtouch-server/
-├── server.js           # Main server — all API logic, discovery, WebSocket bridge
-├── package.json        # Dependencies
-├── stations.json       # Radio station list (created automatically if missing)
-├── speaker-cache.json  # Auto-generated — stores last known speaker IP
+├── server.js               # Main server — API logic, discovery, WebSocket bridge
+├── package.json            # Dependencies
+├── .env                    # Spotify credentials — not in repo, create from .env.example
+├── .env.example            # Template for .env
+├── stations.json           # Saved radio stations (created automatically if missing)
+├── speaker-cache.json      # Auto-generated — not in repo, stores last known speaker IP
+├── spotify-tokens.json     # Auto-generated — not in repo, stores Spotify OAuth tokens
 └── public/
-    └── index.html      # Web interface — served statically by Express
+    ├── index.html          # Web interface
+    ├── manifest.json       # PWA manifest
+    ├── sw.js               # Service worker for offline support
+    └── icons/
+        ├── icon-192.png    # PWA icon
+        └── icon-512.png    # PWA icon
 ```
+
+Files excluded from the repository for security: `.env`, `spotify-tokens.json`, `speaker-cache.json`, `node_modules/`.
 
 ---
 
@@ -71,50 +97,49 @@ git clone https://github.com/davecosta17/soundtouch-server.git
 cd soundtouch-server
 ```
 
-Or download and extract the ZIP, then open a terminal in the project folder.
-
 **2. Install dependencies**
 
 ```bash
 npm install
 ```
 
-This installs four packages:
+This installs five packages:
 - `express` — HTTP server and static file serving
-- `axios` — HTTP client for speaker API calls
+- `axios` — HTTP client for speaker and Spotify API calls
 - `ws` — WebSocket server (browser ↔ server) and client (server ↔ speaker)
 - `multicast-dns` — mDNS querying for automatic speaker discovery
+- `dotenv` — loads Spotify credentials from `.env`
 
 **3. Create a stations.json file**
 
-The server requires a `stations.json` file in the project root. Create one with an empty array to start, or pre-populate it:
+Create an empty `stations.json` in the project root to start, or pre-populate it:
 
 ```json
 [
   {
     "name": "BBC World Service",
     "url": "http://stream.live.vc.bbcmedia.co.uk/bbc_world_service"
-  },
-  {
-    "name": "Classic FM",
-    "url": "http://media-ice.musicradio.com/ClassicFMMP3"
   }
 ]
 ```
 
-You can also add stations directly through the web interface — no manual editing required after initial setup.
+You can add and remove stations directly from the web interface at any time.
+
+**4. Configure Spotify (optional)**
+
+Copy `.env.example` to `.env` and fill in your credentials. See [Spotify Integration](#spotify-integration) for the full setup steps.
 
 ---
 
 ## Configuration
 
-### Automatic (recommended)
+### Automatic speaker discovery (recommended)
 
 No configuration needed. On first run the server sends mDNS queries every 5 seconds to find the speaker. Once found, the IP is saved to `speaker-cache.json` and reused on every subsequent start — the cache is validated with a quick ping before being trusted.
 
 ### Manual IP override (if mDNS is blocked)
 
-mDNS uses UDP multicast on port 5353. On some Windows machines, Windows Firewall blocks this traffic. If the server prints `[mDNS] Querying...` indefinitely without finding the speaker, set the IP manually:
+mDNS uses UDP multicast on port 5353. On some Windows machines, Windows Firewall blocks this. If the server prints `[mDNS] Querying...` indefinitely, set the IP manually:
 
 **Windows:**
 ```cmd
@@ -127,13 +152,51 @@ npm start
 SPEAKER_IP=192.168.1.x npm start
 ```
 
-Replace `192.168.1.x` with your speaker's actual IP address, which you can find in your router's connected devices list.
-
-Once the server finds the speaker (either via mDNS or manual IP), it writes `speaker-cache.json` and subsequent starts will be instant.
+Replace `192.168.1.x` with your speaker's actual IP, found in your router's connected devices list.
 
 ### Subnet scanning fallback
 
-If mDNS fails and no `SPEAKER_IP` is set, the server waits 15 seconds then scans every IP on all detected local subnets (e.g. `192.168.1.1–254`), probing port 8090 in parallel batches. This takes around 7 seconds to complete and runs every 60 seconds until the speaker is found. After discovery the cache is written and scanning stops.
+If mDNS fails and no `SPEAKER_IP` is set, the server waits 15 seconds then scans all detected local subnets in parallel batches of 30, probing port 8090 with an 800ms timeout. Rescans every 60 seconds until the speaker is found.
+
+---
+
+## Spotify Integration
+
+Spotify features (progress bar, queue, liked songs, shuffle/repeat sync) require a Spotify Developer app and a one-time authorisation.
+
+**1. Create a Spotify Developer app**
+
+Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) and create a new app. Under Settings, add the following Redirect URI:
+
+```
+http://127.0.0.1:3000/spotify/callback
+```
+
+Note: Spotify requires the loopback IP `127.0.0.1` — `localhost` is not permitted as of April 2025.
+
+**2. Configure .env**
+
+Copy `.env.example` to `.env` and fill in your credentials:
+
+```
+SPOTIFY_CLIENT_ID=your_client_id_here
+SPOTIFY_CLIENT_SECRET=your_client_secret_here
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:3000/spotify/callback
+```
+
+**3. Authorise the app**
+
+Start the server, then open the following URL **in a browser on the machine running the server** (not from your phone):
+
+```
+http://127.0.0.1:3000/spotify/login
+```
+
+This redirects to Spotify's authorisation page. Grant permission and you'll be redirected back. The server saves your tokens to `spotify-tokens.json` automatically. You only need to do this once — tokens refresh automatically every hour.
+
+**4. Verify**
+
+Open `http://localhost:3000/spotify/status` — it should return `{ "connected": true }`.
 
 ---
 
@@ -146,58 +209,83 @@ npm start
 On a successful start you should see something like:
 
 ```
+SoundTouch Server running on port 3000
 [mDNS] Querying for _soundtouch._tcp.local…
 [Cache] Last known IP: 192.168.1.169 — validating…
-SoundTouch Server running on port 3000
 [Cache] Confirmed — speaker still at 192.168.1.169
-[Discovery] Speaker "SoundTouch" found at 192.168.1.169
+[Discovery] Speaker "SOUNDWAVE" found at 192.168.1.169
 [SpeakerWS] Connecting to ws://192.168.1.169:8080
 [SpeakerWS] Connected
 [Caps] Bass:true Tone:false DSP:false
 ```
 
-Open **http://localhost:3000** in a browser to access the interface. From other devices on your network, use your PC's local IP instead of `localhost`, e.g. **http://192.168.1.50:3000**.
+Open **http://localhost:3000** in a browser on the server machine, or **http://[server-ip]:3000** from any other device on the same network.
 
 ---
 
 ## Using the Web Interface
 
-### Main Screen
+### Main screen
 
-The main screen is always visible and shows:
+The interface adapts based on what's playing:
 
-- **Top bar** — hamburger menu (left), speaker name (centre, tap to rename), power button (right)
-- **Now Playing** — when album art is available (Spotify, some radio) the art fills the screen with a dynamic background colour extracted from it. When there is no art (Bluetooth, AUX, standby) a frosted card shows the track title, artist, and album
-- **Source label** — shows the active source, e.g. "Bluetooth · TV" or "Spotify Connect"
-- **Elapsed timer & progress bar** — appears during playback, resets on track change
-- **Transport controls** — previous, play/pause, next
-- **Volume row** — mute toggle (speaker icon, left), volume slider, max volume icon (right)
-- **Source tabs** — quick-switch between Bluetooth, AUX, and Wi-Fi sources
+**Art mode** — when album art is available (Spotify Connect, some radio stations), the art fills the screen as a large square image. The background colour is dynamically extracted from the art. Below the art, the track name scrolls horizontally if too long. The artist, album, heart icon (Spotify only), and queue icon (Spotify only) sit in a row below the track name.
 
-### Renaming the Speaker
+**Card mode** — when no art is available (Bluetooth, AUX, standby), a frosted glass card shows the track title, artist, and album.
 
-Tap the speaker name at the top of the screen. An inline text field appears pre-filled with the current name. Press **Enter** to save or **Esc** to cancel. The new name is written to the speaker's memory and persists after a reboot.
+Both modes share the same bottom section: source label or Spotify progress bar, transport controls, volume slider with mute toggle, and source tabs.
 
-### Hamburger Menu (Drawer)
+### Top bar
 
-Tap the hamburger icon (top left) to open the slide-in drawer. It contains four sections:
+Hamburger menu (left) | speaker name (centre, tap to rename) | power button (right). The power button glows blue when the speaker is active on any source.
 
-**Recently Played** — last 10 items played on the speaker regardless of source. Tap any item to resume it immediately. The list updates automatically whenever something new is played.
+### Source tabs
 
-**Radio Stations** — search TuneIn's directory and manage your saved stations.
+Three tabs at the bottom switch the active input:
 
-A search bar at the top lets you search Radio Browser's open directory of 30,000+ stations. Results are sorted by popularity and only include stations verified as online. Each result shows the station logo, name, country, codec, and bitrate. Tap a result to reveal two options:
-- **▶ Play Now** — plays the station immediately and closes the drawer
-- **+ Save** — adds the station to your saved list permanently, including its logo
+- **Bluetooth** — connects to the last paired device
+- **AUX** — switches to the AUX input
+- **Wi-Fi** — opens a small popover with two options: Spotify Connect and Radio
 
-Below the search results are your saved stations, each showing its logo if available. Tap a station to play it. Use the × button to remove a station. Add new stations using the form at the bottom — enter a name and a direct stream URL (must be an `http://` or `https://` stream, not a playlist page).
+The active tab glows blue.
 
-**Sources** — all sources the speaker reports, with their current status (Ready / Unavailable). Tap a Ready source to switch to it. The active source is highlighted.
+### Transport controls
 
-**EQ** — equaliser controls. Only sections supported by your speaker are shown:
-- *Bass* — available on most SoundTouch models
-- *Tone* (Bass + Treble) — available on models with full tone controls
-- *Audio Mode* — Normal, Direct, Dialog, Night — available on soundbars
+Laid out as: shuffle | previous | play/pause | next | repeat
+
+Shuffle and repeat illuminate blue when active. Repeat cycles off → all → one → off. During Spotify playback both buttons reflect actual Spotify state and update within 2 seconds if changed from another device.
+
+### Spotify progress bar
+
+Replaces the source label during Spotify playback. Shows elapsed time left, total duration right. Tap to seek.
+
+### Heart icon (Spotify only)
+
+Left of artist/album info. Faintly visible when not liked, glows blue when liked. Tap to toggle. Optimistic update — reverts if the API call fails.
+
+### Queue icon (Spotify only)
+
+Right of artist/album info. Opens a right-side drawer showing up to 10 upcoming tracks. Tap any track to skip to it — a confirmation dialog shows how many tracks will be skipped.
+
+### Up Next flyout
+
+Slides down from the top of the screen 20 seconds before the current track ends. Shows the next track's art, name, and artist. Auto-dismisses after 5 seconds or tap to dismiss early.
+
+### Hamburger drawer
+
+Contains one section — **Radio Stations**. Search bar at the top queries Radio Browser's directory. Results show station logo, name, country, codec, and bitrate (live-verified only). Tap a result to expand Play Now / Save options. Saved stations appear below with logos. Tap to play, × to remove. Add stations manually via the form at the bottom.
+
+### Renaming the speaker
+
+Tap the speaker name in the top bar. An inline text field appears. Press Enter to save or Esc to cancel. The name persists after a reboot.
+
+### Installing as a PWA
+
+**Android (Chrome):** tap the three-dot menu → "Add to Home Screen" or "Install app".
+
+**iOS (Safari):** tap Share → "Add to Home Screen".
+
+The app installs under the name "Speaker Remote" and launches full-screen.
 
 ---
 
@@ -205,42 +293,47 @@ Below the search results are your saved stations, each showing its logo if avail
 
 The server uses three mechanisms in priority order:
 
-1. **Cached IP** — on startup, if `speaker-cache.json` exists, it pings the cached IP's `/info` endpoint (2.5s timeout). If it responds, the speaker is considered found immediately and mDNS is skipped.
+1. **Cached IP** — pings the last known IP on startup with a 2.5s timeout. If it responds, discovery is complete immediately.
 
-2. **mDNS** — active PTR queries are sent for `_soundtouch._tcp.local` every 5 seconds until the speaker responds. After discovery, queries slow to every 30 seconds as a heartbeat to detect IP changes.
+2. **mDNS** — PTR queries for `_soundtouch._tcp.local` every 5 seconds until found, then every 30 seconds as a heartbeat.
 
-3. **Subnet scan** — if neither of the above finds the speaker within 15 seconds, all non-loopback IPv4 subnets on the machine are scanned in parallel batches of 30, probing port 8090 with a 800ms timeout. Rescans every 60 seconds until found.
-
-Once discovered, `speaker-cache.json` is written and reused on future starts.
+3. **Subnet scan** — fires after 15 seconds if mDNS fails. Scans all local subnets in parallel batches of 30 with an 800ms timeout per host. Retries every 60 seconds.
 
 ---
 
 ## How Radio Stations Work
 
-The Bose cloud previously served station stream metadata (artwork, stream URL) from `content.api.bose.io`. Since that service shuts down with the cloud, this server replaces it entirely.
+When a station plays, the speaker fetches a metadata endpoint on our server which returns the exact JSON format Bose's cloud used:
 
-When you play a radio station, the server tells the speaker to load a `LOCAL_INTERNET_RADIO` content item pointing to `http://[your-server]/station-data/[id]`. The speaker fetches that URL from your server, which returns the station's name and stream URL from your local `stations.json`. The speaker then connects directly to the stream URL.
+```json
+{
+  "audio": { "hasPlaylist": false, "isRealtime": true, "streamUrl": "http://..." },
+  "imageUrl": "",
+  "name": "Station Name",
+  "streamType": "liveRadio"
+}
+```
 
-This means radio playback works completely offline (relative to the internet) — as long as the stream itself is accessible, no Bose cloud involvement is needed.
+The speaker connects directly to `streamUrl`. HTTPS streams are automatically proxied through the server over plain HTTP since SoundTouch firmware cannot connect to HTTPS audio directly.
 
 ---
 
 ## API Reference
 
-All endpoints are on port 3000. Successful responses return HTTP 200; errors return HTTP 400 (bad input) or 502 (speaker unreachable).
+All endpoints on port 3000. HTTP 200 on success, 400 on bad input, 502 on speaker/Spotify unreachable.
 
 ### Playback
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/power` | GET | Toggle power on/off |
+| `/power` | GET | Toggle power |
 | `/play` | GET | Play |
 | `/pause` | GET | Pause |
 | `/playpause` | GET | Toggle play/pause |
-| `/next` | GET | Skip to next track |
+| `/next` | GET | Next track |
 | `/prev` | GET | Previous track |
-| `/repeat/:mode` | GET | Set repeat — `one`, `all`, `off` |
-| `/shuffle/:mode` | GET | Set shuffle — `on`, `off` |
+| `/repeat/:mode` | GET | `one`, `all`, or `off` |
+| `/shuffle/:mode` | GET | `on` or `off` |
 
 ### Volume
 
@@ -253,92 +346,100 @@ All endpoints are on port 3000. Successful responses return HTTP 200; errors ret
 
 | Endpoint | Method | Body | Description |
 |---|---|---|---|
-| `/sources` | GET | — | List all sources with status |
-| `/source` | POST | `{ source, sourceAccount, location }` | Switch to a source |
+| `/sources` | GET | — | List all sources |
+| `/source` | POST | `{ source, sourceAccount, location }` | Switch source |
 
 ### Status & Discovery
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/status` | GET | Current playback status as JSON |
+| `/status` | GET | Current playback state as JSON |
 | `/discovery` | GET | `{ discovered, name, ip }` |
 
 ### Speaker Settings
 
 | Endpoint | Method | Body | Description |
 |---|---|---|---|
-| `/name` | POST | `{ name }` | Rename the speaker |
+| `/name` | POST | `{ name }` | Rename speaker |
 
 ### EQ
 
 | Endpoint | Method | Body | Description |
 |---|---|---|---|
-| `/eq` | GET | — | Current EQ values (null fields = not supported) |
-| `/eq/bass` | POST | `{ value }` | Set bass level |
-| `/eq/treble` | POST | `{ value }` | Set treble level |
+| `/eq` | GET | — | Current EQ values |
+| `/eq/bass` | POST | `{ value }` | Set bass |
+| `/eq/treble` | POST | `{ value }` | Set treble |
 | `/eq/mode` | POST | `{ mode }` | Set DSP mode |
 
 ### Presets
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/presets` | GET | Raw preset XML from speaker |
+| `/presets` | GET | Raw preset XML |
 | `/preset/:num` | GET | Activate preset 1–6 |
-
-### Recents
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/recents` | GET | Last 10 played items as JSON |
 
 ### Radio Stations
 
 | Endpoint | Method | Body | Description |
 |---|---|---|---|
-| `/stations` | GET | — | All stations as JSON array |
-| `/stations` | POST | `{ name, url }` | Add a new station |
-| `/stations/:id` | DELETE | — | Remove a station by index |
+| `/stations` | GET | — | All saved stations |
+| `/stations` | POST | `{ name, url, favicon }` | Add station |
+| `/stations/:id` | DELETE | — | Remove station |
 | `/radio/:id` | GET | — | Play station by index |
-| `/station-data/:id` | GET | — | Station metadata (used by speaker internally) |
+| `/orion/station?data=` | GET | — | Station metadata endpoint (used by speaker) |
+| `/station-data/:id` | GET | — | Legacy station metadata |
 
 ### Radio Browser
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/radio-browser/search?q=...` | GET | Search Radio Browser directory — returns top 10 live-verified stations sorted by popularity as `[{ name, streamUrl, bitrate, codec, country, language, tags, favicon, stationuuid }]` |
-| `/radio-browser/play` | POST | `{ streamUrl, name }` — plays a Radio Browser station, proxying HTTPS streams if needed |
-| `/radio/stream-proxy?url=...` | GET | Pipes an HTTPS audio stream over HTTP — required because SoundTouch firmware cannot connect to HTTPS audio directly |
-| `/radio/stream-data?url=...&name=...` | GET | Metadata endpoint the speaker fetches to get the stream URL — same contract as `/station-data/:id` |
+| `/radio-browser/search?q=` | GET | Search — returns up to 10 live-verified stations |
+| `/radio-browser/play` | POST | `{ streamUrl, name, favicon }` |
+| `/radio/stream-proxy?url=` | GET | HTTPS→HTTP audio proxy |
+| `/radio/stream-data?url=&name=` | GET | Dynamic metadata endpoint |
 
 ### Art Proxy
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/art-proxy?url=...` | GET | Proxies album art through the server (avoids CORS for canvas colour extraction) |
+| `/art-proxy?url=` | GET | Proxy album art for canvas colour extraction |
+
+### Spotify
+
+| Endpoint | Method | Body | Description |
+|---|---|---|---|
+| `/spotify/login` | GET | — | Redirect to Spotify OAuth |
+| `/spotify/callback` | GET | — | OAuth callback — saves tokens |
+| `/spotify/status` | GET | — | `{ connected, hasClientId }` |
+| `/spotify/seek` | POST | `{ position_ms }` | Seek in current track |
+| `/spotify/queue` | GET | — | Up to 10 upcoming tracks |
+| `/spotify/liked?id=` | GET | — | `{ liked: bool }` |
+| `/spotify/like` | POST | `{ id }` | Save to Liked Songs |
+| `/spotify/like` | DELETE | `{ id }` | Remove from Liked Songs |
 
 ---
 
 ## WebSocket Events
 
-The server exposes a WebSocket on the same port as HTTP (port 3000). The browser interface connects to it automatically. All events are JSON.
+WebSocket on port 3000. UI connects automatically. All messages are JSON.
 
 ### Server → Browser
 
-| `type` | Payload | Description |
+| `type` | Key fields | Description |
 |---|---|---|
-| `status` | `{ source, wifiType, track, artist, album, stationName, bluetoothDevice, artUrl, status, volume }` | Playback state update |
-| `eq` | `{ bass, treble, dsp }` | EQ state update (null fields = not supported) |
-| `sources` | `{ sources: [...] }` | Sources list updated |
-| `recents` | `{ recents: [...] }` | Recents list updated |
-| `info` | `{ name }` | Speaker name changed |
+| `status` | `source, wifiType, track, artist, album, stationName, bluetoothDevice, artUrl, status, volume, muted` | Full playback state |
+| `eq` | `bass, treble, dsp` | EQ state (null = not supported) |
+| `sources` | `sources[]` | Sources list |
+| `info` | `name` | Speaker renamed |
+| `progress` | `progress_ms, duration_ms, is_playing, shuffle_state, repeat_state, next_track, track_id` | Spotify playback state (every 2s) |
 
-On initial browser connection, all five event types are sent immediately so the UI populates without waiting for the next change.
+All event types except `progress` are sent immediately on initial browser connection.
 
 ### How it works internally
 
-The server maintains its own WebSocket connection to the speaker on port 8080 (protocol `gabbo`). The speaker pushes change notifications — `nowPlayingUpdated`, `volumeUpdated`, `bassUpdated`, `sourcesUpdated`, `recentsUpdated`, `infoUpdated` — which the server receives, fetches the updated data, and rebroadcasts to all connected browsers.
+The server maintains a WebSocket to the speaker on port 8080 (protocol `gabbo`). Speaker push notifications — `nowPlayingUpdated`, `volumeUpdated`, `bassUpdated`, `sourcesUpdated`, `infoUpdated` — trigger a fetch and rebroadcast to all connected browsers. A 3-second fallback poll runs when the speaker WebSocket is down. A 15-second heartbeat poll runs regardless.
 
-A 3-second fallback poll runs when the speaker WebSocket is disconnected. A 15-second heartbeat poll runs regardless to catch any missed events.
+During Spotify playback a separate 2-second poller hits the Spotify Web API for progress, shuffle, repeat, and track ID. A second call to `/me/player/queue` fires only when within 25 seconds of track end to populate the Up Next flyout.
 
 ---
 
@@ -346,26 +447,28 @@ A 3-second fallback poll runs when the speaker WebSocket is disconnected. A 15-s
 
 **Speaker not found / stays on "Connecting…"**
 
-The mDNS queries are firing but getting no response. This is usually Windows Firewall blocking UDP multicast on port 5353. Use the `SPEAKER_IP` environment variable to bypass discovery (see [Configuration](#configuration)). Alternatively, allow Node.js through Windows Defender Firewall → Allow an app → add `node.exe`, ticking both Private and Public.
+Windows Firewall is likely blocking UDP multicast on port 5353. Use the `SPEAKER_IP` environment variable to bypass discovery, or allow Node.js through Windows Defender Firewall → Allow an app → add `node.exe` with both Private and Public checked.
 
-**"SPEAKER OFFLINE — RETRYING…" banner showing even when speaker is on**
+**"SPEAKER OFFLINE — RETRYING…" banner**
 
-This means the browser's WebSocket connection to the server dropped. It reconnects automatically every 3 seconds. If it persists, check that the server is still running in the terminal.
+The browser WebSocket connection dropped. It reconnects automatically every 3 seconds. If it persists, check the server is still running.
 
 **Album art not showing on Spotify**
 
-Open `http://localhost:3000/status` and check the `artUrl` field. If it is `null`, the speaker is not reporting art (this can happen briefly at track start while the art loads). If it has a URL, try a hard refresh in the browser (Ctrl+Shift+R) to clear the cached page.
+Check `http://localhost:3000/status` for the `artUrl` field. If null, the speaker hasn't reported art yet — wait a moment and it should appear. Try a hard refresh (Ctrl+Shift+R) if it still doesn't show.
 
 **Radio stations not playing**
 
-For manually added stations, the URL must be a direct audio stream — not a website or playlist page. URLs ending in `.mp3`, `.aac`, `.ogg`, or containing `/stream` typically work.
+For manually added stations, the URL must be a direct audio stream — `.mp3`, `.aac`, `.ogg`, or a path containing `/stream`. For Radio Browser results, streams are pre-verified but must be reachable from your network. If a station buffers indefinitely, try a different result for the same station.
 
-For Radio Browser results, streams are pre-verified as online, but the speaker connects to them directly (or via the HTTPS proxy) so the stream must be reachable from your local network. If a station buffers indefinitely, try a different result for the same station — Radio Browser often lists multiple stream URLs per station at different bitrates.
+**Spotify features not working**
+
+Check `http://localhost:3000/spotify/status`. If `connected` is false, open `http://127.0.0.1:3000/spotify/login` in a browser on the server machine to re-authorise. If `hasClientId` is false, your `.env` file is missing or not being loaded — ensure it exists in the project root.
+
+**Spotify progress bar not appearing**
+
+The progress bar only shows during active Spotify Connect playback. Make sure you have started playback from the Spotify app to the speaker. The poller starts automatically once the server detects Spotify as the active source.
 
 **EQ controls not showing**
 
-EQ controls are capability-gated — the server checks `/capabilities` and `/bassCapabilities` on the speaker at startup and only exposes what it reports as supported. If no EQ controls appear in the drawer, your speaker model does not support them via the API.
-
-**Mute state out of sync after restart**
-
-The mute icon in the UI is initialised as unmuted on page load. If the speaker is actually muted when you open the page, the icon will be wrong until you tap it once. A future improvement would be to read the mute state from `/volume` on connect.
+EQ is capability-gated — the server checks `/capabilities` and `/bassCapabilities` at startup. If the drawer has no EQ section, your speaker model does not expose EQ controls via the API.
