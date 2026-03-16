@@ -263,6 +263,118 @@
     color: rgba(30,30,30,0.5); letter-spacing: 0.02em;
   }
   .app.art-mode .sp-time-row { color: rgba(255,255,255,0.45); }
+
+  /* ── Queue icon button ───────────────────────────────────────────────────── */
+  .btn-queue {
+    display: none; background: none; border: none; cursor: pointer;
+    padding: 6px; -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-queue.visible { display: block; }
+  .btn-queue:active { opacity: 0.6; }
+  .btn-queue svg { width: 22px; height: 22px; display: block; fill: rgba(255,255,255,0.75); }
+  .app:not(.art-mode) .btn-queue svg { fill: rgba(30,30,30,0.65); }
+
+  /* ── Queue right drawer ──────────────────────────────────────────────────── */
+  .queue-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
+    z-index: 200;
+  }
+  .queue-overlay.open { display: block; }
+  .queue-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 82%; max-width: 340px;
+    background: #181818; z-index: 201;
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    overflow: hidden;
+  }
+  .queue-overlay.open .queue-drawer { transform: translateX(0); }
+  .queue-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 20px; cursor: pointer;
+    transition: background 0.15s; -webkit-tap-highlight-color: transparent;
+  }
+  .queue-item:active { background: rgba(255,255,255,0.06); }
+  .queue-item-num {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.75rem;
+    font-weight: 600; color: rgba(255,255,255,0.25); width: 16px;
+    text-align: center; flex-shrink: 0;
+  }
+  .queue-item-art {
+    width: 42px; height: 42px; border-radius: 4px;
+    object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08);
+  }
+  .queue-item-info { min-width: 0; flex: 1; }
+  .queue-item-name {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 600;
+    font-size: 0.95rem; letter-spacing: 0.04em; color: var(--white);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .queue-item-artist {
+    font-size: 0.75rem; color: rgba(255,255,255,0.4); margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ── Skip confirmation ───────────────────────────────────────────────────── */
+  .queue-confirm {
+    display: none; position: fixed; inset: 0; z-index: 300;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  }
+  .queue-confirm.open { display: flex; }
+  .queue-confirm-box {
+    background: #222; border-radius: 16px; padding: 24px 20px;
+    width: 80%; max-width: 300px; text-align: center;
+  }
+  .queue-confirm-msg {
+    font-family: 'Barlow', sans-serif; font-size: 0.9rem;
+    color: rgba(255,255,255,0.7); margin-bottom: 20px; line-height: 1.5;
+  }
+  .queue-confirm-btns { display: flex; gap: 10px; }
+  .queue-confirm-btn {
+    flex: 1; padding: 12px 0; border-radius: 10px; border: none;
+    cursor: pointer; font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.85rem; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; -webkit-tap-highlight-color: transparent;
+  }
+  .queue-confirm-btn.cancel { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
+  .queue-confirm-btn.ok     { background: #0066ff; color: #fff; }
+
+  /* ── Up Next flyout ──────────────────────────────────────────────────────── */
+  .upnext-flyout {
+    position: fixed; top: 0; left: 50%; transform: translateX(-50%) translateY(-100%);
+    z-index: 400; width: 90%; max-width: 380px;
+    background: rgba(24,24,24,0.96); backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0 0 16px 16px; padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
+  }
+  .upnext-flyout.show { transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  .upnext-art {
+    width: 44px; height: 44px; border-radius: 6px;
+    object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08);
+  }
+  .upnext-info { min-width: 0; flex: 1; }
+  .upnext-label {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.6rem;
+    font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(255,255,255,0.35); margin-bottom: 3px;
+  }
+  .upnext-name {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 1rem; letter-spacing: 0.04em; color: var(--white);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .upnext-artist {
+    font-size: 0.75rem; color: rgba(255,255,255,0.45); margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   /* ── Source Tabs ───────────────────────────────────────────────────────── */
   .source-tabs {
     display: flex; align-items: center;
@@ -653,8 +765,22 @@
     <img class="art-img" id="artImg" src="" alt="Album art" crossorigin="anonymous" />
     <div class="art-info">
       <div class="marquee-wrap"><div class="marquee-inner art-track" id="artTrack"></div></div>
-      <div class="art-artist" id="artArtist"></div>
-      <div class="art-album"  id="artAlbum"></div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:6px">
+        <div style="flex:1;min-width:0">
+          <div class="art-artist" id="artArtist"></div>
+          <div class="art-album"  id="artAlbum"></div>
+        </div>
+        <button class="btn-queue" id="btnQueue" onclick="openQueueDrawer()" title="Queue">
+          <svg viewBox="0 0 24 20" xmlns="http://www.w3.org/2000/svg">
+            <!-- pill outline — top row -->
+            <rect x="1" y="0.5" width="22" height="6" rx="3" ry="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+            <!-- solid bar — middle row -->
+            <rect x="1" y="9.5" width="22" height="4" rx="2" ry="2"/>
+            <!-- solid bar — bottom row -->
+            <rect x="1" y="15.5" width="22" height="4" rx="2" ry="2"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -970,8 +1096,10 @@ function applyStatus(s) {
   // Power button illuminates when speaker is active (not standby)
   document.getElementById('btnPower').classList.toggle('on', s.source !== 'unknown');
 
-  // Hide progress bar if no longer on Spotify
-  if (!(s.source === 'wifi' && s.wifiType === 'spotify')) hideProgress();
+  // Hide progress bar and queue icon if no longer on Spotify
+  const isSpotify = s.source === 'wifi' && s.wifiType === 'spotify';
+  if (!isSpotify) { hideProgress(); dismissUpNext(); }
+  setQueueIconVisible(isSpotify);
 
   document.getElementById('tabBluetooth').classList.toggle('active', s.source === 'bluetooth');
   document.getElementById('tabAux').classList.toggle('active',       s.source === 'aux');
@@ -1336,6 +1464,7 @@ function applyProgress(msg) {
   spIsPlaying   = msg.is_playing   || false;
 
   if (msg.shuffle_state !== undefined) applyShuffleRepeat(msg.shuffle_state, msg.repeat_state || 'off');
+  checkUpNext(msg.progress_ms, msg.duration_ms, msg.next_track);
 
   document.getElementById('spProgressWrap').classList.add('visible');
   document.getElementById('sourceRow').style.display = 'none';
@@ -1458,6 +1587,110 @@ function pauseMarquees() {
 }
 function resumeMarquees() {
   document.querySelectorAll('.marquee-inner.scrolling').forEach(el => el.classList.remove('paused'));
+}
+
+
+// ── Queue drawer ──────────────────────────────────────────────────────────────
+let queueData        = [];
+let queueConfirmSkips = 0;
+let upnextTimer      = null;
+let upnextShown      = false;
+let lastNextTrack    = null;
+
+async function openQueueDrawer() {
+  document.getElementById('queueOverlay').classList.add('open');
+  const list = document.getElementById('queueList');
+  list.innerHTML = '<div style="padding:24px 20px;color:rgba(255,255,255,0.3);font-family:Barlow,sans-serif;font-size:0.85rem">Loading…</div>';
+  try {
+    queueData = await fetch('/spotify/queue').then(r => r.json());
+    if (!queueData.length) {
+      list.innerHTML = '<div style="padding:24px 20px;color:rgba(255,255,255,0.3);font-family:Barlow,sans-serif;font-size:0.85rem">Queue is empty</div>';
+      return;
+    }
+    list.innerHTML = queueData.map((t, i) => `
+      <div class="queue-item" onclick="confirmSkip(${i + 1}, '${t.name.replace(/'/g, "\'")}')">
+        <span class="queue-item-num">${i + 1}</span>
+        <img class="queue-item-art" src="${t.artUrl || ''}" alt="" onerror="this.style.opacity=0" />
+        <div class="queue-item-info">
+          <div class="queue-item-name">${t.name}</div>
+          <div class="queue-item-artist">${t.artist}</div>
+        </div>
+      </div>`).join('');
+  } catch {
+    list.innerHTML = '<div style="padding:24px 20px;color:rgba(255,255,255,0.3);font-family:Barlow,sans-serif;font-size:0.85rem">Could not load queue</div>';
+  }
+}
+
+function closeQueueDrawer(e) {
+  if (e && e.target !== document.getElementById('queueOverlay')) return;
+  document.getElementById('queueOverlay').classList.remove('open');
+}
+
+function confirmSkip(numSkips, trackName) {
+  queueConfirmSkips = numSkips;
+  const msg = numSkips === 1
+    ? `Skip to "${trackName}"?`
+    : `Skip ${numSkips} tracks to "${trackName}"?`;
+  document.getElementById('queueConfirmMsg').textContent = msg;
+  document.getElementById('queueConfirmOk').onclick = executeSkip;
+  document.getElementById('queueConfirm').classList.add('open');
+}
+
+function closeQueueConfirm() {
+  document.getElementById('queueConfirm').classList.remove('open');
+}
+
+async function executeSkip() {
+  closeQueueConfirm();
+  closeQueueDrawer();
+  // Fire next() queueConfirmSkips times with small delay between each
+  for (let i = 0; i < queueConfirmSkips; i++) {
+    await fetch('/next');
+    if (i < queueConfirmSkips - 1) await new Promise(r => setTimeout(r, 600));
+  }
+}
+
+// ── Up Next flyout ────────────────────────────────────────────────────────────
+function showUpNext(track) {
+  if (!track) return;
+  document.getElementById('upnextArt').src    = track.artUrl || '';
+  document.getElementById('upnextName').textContent   = track.name;
+  document.getElementById('upnextArtist').textContent = track.artist;
+  document.getElementById('upnextFlyout').classList.add('show');
+  clearTimeout(upnextTimer);
+  upnextTimer = setTimeout(dismissUpNext, 5000);
+}
+
+function dismissUpNext() {
+  document.getElementById('upnextFlyout').classList.remove('show');
+  clearTimeout(upnextTimer);
+}
+
+// Called from applyProgress — check if we're 20s from the end
+function checkUpNext(progressMs, durationMs, nextTrack) {
+  if (!nextTrack || !durationMs) return;
+  const remaining = durationMs - progressMs;
+  const threshold = 20_000;
+
+  // Show flyout once per track when we cross the 20s mark
+  if (remaining <= threshold && remaining > 0 && !upnextShown) {
+    // Only show if next track changed (new track context)
+    const nextKey = nextTrack.name + nextTrack.artist;
+    if (nextKey !== lastNextTrack) {
+      lastNextTrack = nextKey;
+      upnextShown   = true;
+      showUpNext(nextTrack);
+    }
+  }
+  // Reset flag when a new track starts (remaining resets to full duration)
+  if (remaining > threshold + 5000) {
+    upnextShown = false;
+  }
+}
+
+// Show/hide queue icon based on Spotify active state
+function setQueueIconVisible(visible) {
+  document.getElementById('btnQueue')?.classList.toggle('visible', visible);
 }
 
 // ── Wi-Fi source popover ──────────────────────────────────────────────────────
@@ -1620,5 +1853,41 @@ async function rbSave(i) {
       });
     }
   </script>
+
+<!-- Queue right drawer -->
+<div class="queue-overlay" id="queueOverlay" onclick="closeQueueDrawer(event)">
+  <div class="queue-drawer">
+    <div class="drawer-header">
+      <span class="drawer-title">Up Next</span>
+      <button class="drawer-close" onclick="closeQueueDrawer()">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+    <div class="drawer-body" id="queueList" style="padding:8px 0 32px">
+      <div style="padding:24px 20px;color:rgba(255,255,255,0.3);font-family:Barlow,sans-serif;font-size:0.85rem">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Skip confirmation -->
+<div class="queue-confirm" id="queueConfirm">
+  <div class="queue-confirm-box">
+    <div class="queue-confirm-msg" id="queueConfirmMsg"></div>
+    <div class="queue-confirm-btns">
+      <button class="queue-confirm-btn cancel" onclick="closeQueueConfirm()">Cancel</button>
+      <button class="queue-confirm-btn ok" id="queueConfirmOk">Skip</button>
+    </div>
+  </div>
+</div>
+
+<!-- Up Next flyout -->
+<div class="upnext-flyout" id="upnextFlyout" onclick="dismissUpNext()">
+  <img class="upnext-art" id="upnextArt" src="" alt="" />
+  <div class="upnext-info">
+    <div class="upnext-label">Up Next</div>
+    <div class="upnext-name"   id="upnextName"></div>
+    <div class="upnext-artist" id="upnextArtist"></div>
+  </div>
+</div>
 </body>
 </html>

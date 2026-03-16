@@ -1048,7 +1048,13 @@ async function pollSpotifyProgress() {
             timeout: 3000,
         });
         if (r.status === 204 || !r.data) return; // Nothing playing
-        const { progress_ms, duration_ms, is_playing, item, shuffle_state, repeat_state } = r.data;
+        const { progress_ms, duration_ms, is_playing, item, shuffle_state, repeat_state, context } = r.data;
+        const queue = r.data?.queue || [];
+        const nextTrack = queue[0] ? {
+            name:   queue[0].name,
+            artist: queue[0].artists?.map(a => a.name).join(', ') || '',
+            artUrl: queue[0].album?.images?.[2]?.url || queue[0].album?.images?.[0]?.url || '',
+        } : null;
         broadcast({
             type:         'progress',
             progress_ms:  progress_ms || 0,
@@ -1056,6 +1062,7 @@ async function pollSpotifyProgress() {
             is_playing,
             shuffle_state: shuffle_state || false,
             repeat_state:  repeat_state  || 'off',
+            next_track:    nextTrack,
         });
     } catch (err) {
         if (err.response?.status === 401) {
@@ -1063,6 +1070,29 @@ async function pollSpotifyProgress() {
         }
     }
 }
+
+
+// ─── Spotify Queue ────────────────────────────────────────────────────────────
+app.get('/spotify/queue', async (req, res) => {
+    const token = await getSpAccessToken();
+    if (!token) return res.status(401).send('Not authenticated with Spotify');
+    try {
+        const r = await axios.get('https://api.spotify.com/v1/me/player/queue', {
+            headers: { Authorization: 'Bearer ' + token },
+            timeout: 5000,
+        });
+        const queue = (r.data?.queue || []).slice(0, 5).map(t => ({
+            name:   t.name,
+            artist: t.artists?.map(a => a.name).join(', ') || '',
+            artUrl: t.album?.images?.[2]?.url || t.album?.images?.[0]?.url || '',
+            uri:    t.uri,
+        }));
+        res.json(queue);
+    } catch (err) {
+        console.error('[Spotify/queue]', err.response?.data || err.message);
+        res.status(502).send('Queue fetch failed');
+    }
+});
 
 // ─── HTTP + WebSocket server ───────────────────────────────────────────────────
 
