@@ -1044,14 +1044,7 @@ async function api(endpoint) {
 
 function togglePlay() { api(isPlaying ? 'pause' : 'play'); }
 
-function handleBluetoothTab() {
-  if (currentSource === 'bluetooth') {
-    // Already on Bluetooth — put speaker into pairing/discovery mode
-    fetch('/bluetooth-discover').catch(() => {});
-  } else {
-    switchSource('BLUETOOTH', '');
-  }
-}
+function handleBluetoothTab() { switchSource('BLUETOOTH', ''); }
 
 async function switchSource(source, sourceAccount) {
   try {

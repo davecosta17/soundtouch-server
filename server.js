@@ -605,14 +605,6 @@ const keyRoute = (key, msg) => async (req, res) => {
 
 app.get('/power',     keyRoute('POWER',      'Power toggled'));
 
-// Put speaker into Bluetooth pairing/discovery mode
-app.get('/bluetooth-discover', async (req, res) => {
-    try {
-        await sendKey('PAIR');
-        res.send('Discovering');
-    } catch (err) { res.status(502).send('Error'); }
-});
-
 app.get('/mute', async (req, res) => {
     try {
         const volRes = await axios.get(`${speakerUrl()}/volume`, { timeout: 3000 });
