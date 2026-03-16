@@ -264,6 +264,30 @@
   }
   .app.art-mode .sp-time-row { color: rgba(255,255,255,0.45); }
 
+
+  /* ── Heart / Liked button ────────────────────────────────────────────────── */
+  .btn-heart {
+    display: none; background: none; border: none; cursor: pointer;
+    padding: 6px; -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s, transform 0.12s;
+    flex-shrink: 0;
+  }
+  .btn-heart.visible { display: block; }
+  .btn-heart:active { transform: scale(0.85); }
+  .btn-heart svg { width: 22px; height: 22px; display: block; }
+  /* Hollow heart — faded */
+  .btn-heart .heart-empty {
+    fill: none; stroke: rgba(255,255,255,0.25); stroke-width: 2;
+    transition: stroke 0.2s;
+  }
+  .app:not(.art-mode) .btn-heart .heart-empty { stroke: rgba(30,30,30,0.35); }
+  /* Filled heart — active / liked */
+  .btn-heart .heart-filled {
+    display: none;
+    fill: #0066ff; filter: drop-shadow(0 0 6px #0044ffcc);
+  }
+  .btn-heart.liked .heart-empty { display: none; }
+  .btn-heart.liked .heart-filled { display: block; }
   /* ── Queue icon button ───────────────────────────────────────────────────── */
   .btn-queue {
     display: none; background: none; border: none; cursor: pointer;
@@ -765,16 +789,23 @@
     <img class="art-img" id="artImg" src="" alt="Album art" crossorigin="anonymous" />
     <div class="art-info">
       <div class="marquee-wrap"><div class="marquee-inner art-track" id="artTrack"></div></div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:6px">
-        <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+        <!-- Heart — left -->
+        <button class="btn-heart" id="btnHeart" onclick="toggleLike()" title="Like">
+          <svg viewBox="0 0 24 24">
+            <path class="heart-empty" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            <path class="heart-filled" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </button>
+        <!-- Artist / Album — centre -->
+        <div style="flex:1;min-width:0;text-align:center;padding:0 8px">
           <div class="art-artist" id="artArtist"></div>
           <div class="art-album"  id="artAlbum"></div>
         </div>
+        <!-- Queue — right -->
         <button class="btn-queue" id="btnQueue" onclick="openQueueDrawer()" title="Queue">
           <svg viewBox="0 0 24 20" xmlns="http://www.w3.org/2000/svg">
-            <!-- pill outline — top row in accent blue -->
             <rect x="1" y="0.5" width="22" height="6" rx="3" ry="3" fill="none" stroke="#0066ff" stroke-width="1.8"/>
-            <!-- solid bars — inherit currentColor (white in art-mode, dark otherwise) -->
             <rect x="1" y="9.5" width="22" height="4" rx="2" ry="2"/>
             <rect x="1" y="15.5" width="22" height="4" rx="2" ry="2"/>
           </svg>
@@ -1099,6 +1130,7 @@ function applyStatus(s) {
   const isSpotify = s.source === 'wifi' && s.wifiType === 'spotify';
   if (!isSpotify) { hideProgress(); dismissUpNext(); }
   setQueueIconVisible(isSpotify);
+  setHeartVisible(isSpotify);
 
   document.getElementById('tabBluetooth').classList.toggle('active', s.source === 'bluetooth');
   document.getElementById('tabAux').classList.toggle('active',       s.source === 'aux');
@@ -1465,6 +1497,12 @@ function applyProgress(msg) {
   if (msg.shuffle_state !== undefined) applyShuffleRepeat(msg.shuffle_state, msg.repeat_state || 'off');
   checkUpNext(msg.progress_ms, msg.duration_ms, msg.next_track);
 
+  // Fetch liked status when track changes
+  if (msg.track_id && msg.track_id !== currentTrackId) {
+    currentTrackId = msg.track_id;
+    fetchLikedStatus(currentTrackId);
+  }
+
   document.getElementById('spProgressWrap').classList.add('visible');
   document.getElementById('sourceRow').style.display = 'none';
   renderProgress();
@@ -1588,6 +1626,47 @@ function resumeMarquees() {
   document.querySelectorAll('.marquee-inner.scrolling').forEach(el => el.classList.remove('paused'));
 }
 
+
+
+// ── Liked Songs ───────────────────────────────────────────────────────────────
+let currentTrackId = null;
+let isLiked        = false;
+
+async function fetchLikedStatus(trackId) {
+  if (!trackId) return;
+  try {
+    const r = await fetch(`/spotify/liked?id=${trackId}`).then(r => r.json());
+    isLiked = r.liked;
+    document.getElementById('btnHeart')?.classList.toggle('liked', isLiked);
+  } catch {}
+}
+
+async function toggleLike() {
+  if (!currentTrackId) return;
+  // Optimistic update
+  isLiked = !isLiked;
+  document.getElementById('btnHeart')?.classList.toggle('liked', isLiked);
+  try {
+    await fetch('/spotify/like', {
+      method: isLiked ? 'POST' : 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: currentTrackId })
+    });
+  } catch {
+    // Revert on failure
+    isLiked = !isLiked;
+    document.getElementById('btnHeart')?.classList.toggle('liked', isLiked);
+  }
+}
+
+function setHeartVisible(visible) {
+  document.getElementById('btnHeart')?.classList.toggle('visible', visible);
+  if (!visible) {
+    currentTrackId = null;
+    isLiked = false;
+    document.getElementById('btnHeart')?.classList.remove('liked');
+  }
+}
 
 // ── Queue drawer ──────────────────────────────────────────────────────────────
 let queueData        = [];

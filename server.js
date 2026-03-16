@@ -1049,6 +1049,7 @@ async function pollSpotifyProgress() {
         });
         if (r.status === 204 || !r.data) return; // Nothing playing
         const { progress_ms, duration_ms, is_playing, item, shuffle_state, repeat_state } = r.data;
+        const track_id = item?.id || null;
         const trackDuration = item?.duration_ms || duration_ms || 0;
         const remaining     = trackDuration - (progress_ms || 0);
 
@@ -1079,6 +1080,7 @@ async function pollSpotifyProgress() {
             shuffle_state: shuffle_state || false,
             repeat_state:  repeat_state  || 'off',
             next_track:    nextTrack,
+            track_id,
         });
     } catch (err) {
         if (err.response?.status === 401) {
@@ -1108,6 +1110,48 @@ app.get('/spotify/queue', async (req, res) => {
         console.error('[Spotify/queue]', err.response?.data || err.message);
         res.status(502).send('Queue fetch failed');
     }
+});
+
+
+// ─── Spotify Liked Songs ──────────────────────────────────────────────────────
+app.get('/spotify/liked', async (req, res) => {
+    const { id } = req.query;
+    if (!id) return res.status(400).send('id required');
+    const token = await getSpAccessToken();
+    if (!token) return res.status(401).send('Not authenticated');
+    try {
+        const r = await axios.get(`https://api.spotify.com/v1/me/tracks/contains?ids=${id}`, {
+            headers: { Authorization: 'Bearer ' + token }, timeout: 3000,
+        });
+        res.json({ liked: r.data?.[0] === true });
+    } catch (err) {
+        console.error('[Spotify/liked]', err.response?.data || err.message);
+        res.status(502).send('Failed');
+    }
+});
+
+app.post('/spotify/like', async (req, res) => {
+    const { id } = req.body;
+    if (!id) return res.status(400).send('id required');
+    const token = await getSpAccessToken();
+    if (!token) return res.status(401).send('Not authenticated');
+    try {
+        await axios.put(`https://api.spotify.com/v1/me/tracks?ids=${id}`, {},
+            { headers: { Authorization: 'Bearer ' + token } });
+        res.send('Liked');
+    } catch (err) { res.status(502).send('Failed'); }
+});
+
+app.delete('/spotify/like', async (req, res) => {
+    const { id } = req.body;
+    if (!id) return res.status(400).send('id required');
+    const token = await getSpAccessToken();
+    if (!token) return res.status(401).send('Not authenticated');
+    try {
+        await axios.delete(`https://api.spotify.com/v1/me/tracks?ids=${id}`,
+            { headers: { Authorization: 'Bearer ' + token }, data: { ids: [id] } });
+        res.send('Unliked');
+    } catch (err) { res.status(502).send('Failed'); }
 });
 
 // ─── HTTP + WebSocket server ───────────────────────────────────────────────────
