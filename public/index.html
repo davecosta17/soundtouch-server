@@ -1668,23 +1668,25 @@ function dismissUpNext() {
 
 // Called from applyProgress — check if we're 20s from the end
 function checkUpNext(progressMs, durationMs, nextTrack) {
-  if (!nextTrack || !durationMs) return;
+  if (!durationMs) return;
   const remaining = durationMs - progressMs;
   const threshold = 20_000;
 
+  // Reset flag when a new track starts (remaining resets to full duration)
+  // Must happen regardless of whether next_track is available
+  if (remaining > threshold + 5000) {
+    upnextShown = false;
+  }
+
   // Show flyout once per track when we cross the 20s mark
-  if (remaining <= threshold && remaining > 0 && !upnextShown) {
-    // Only show if next track changed (new track context)
+  if (!nextTrack || !remaining || upnextShown) return;
+  if (remaining <= threshold && remaining > 0) {
     const nextKey = nextTrack.name + nextTrack.artist;
     if (nextKey !== lastNextTrack) {
       lastNextTrack = nextKey;
       upnextShown   = true;
       showUpNext(nextTrack);
     }
-  }
-  // Reset flag when a new track starts (remaining resets to full duration)
-  if (remaining > threshold + 5000) {
-    upnextShown = false;
   }
 }
 
