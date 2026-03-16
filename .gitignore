@@ -1,2 +1,4 @@
 .env
 spotify-tokens.json
+node_modules/
+speaker-cache.json
