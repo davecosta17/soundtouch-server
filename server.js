@@ -1097,7 +1097,7 @@ app.get('/spotify/queue', async (req, res) => {
             headers: { Authorization: 'Bearer ' + token },
             timeout: 5000,
         });
-        const queue = (r.data?.queue || []).slice(0, 5).map(t => ({
+        const queue = (r.data?.queue || []).slice(0, 10).map(t => ({
             name:   t.name,
             artist: t.artists?.map(a => a.name).join(', ') || '',
             artUrl: t.album?.images?.[2]?.url || t.album?.images?.[0]?.url || '',
