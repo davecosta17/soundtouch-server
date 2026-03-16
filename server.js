@@ -307,9 +307,7 @@ function connectSpeakerWs() {
         if (xml.includes('sourcesUpdated')) {
             broadcastSources();
         }
-        if (xml.includes('recentsUpdated')) {
-            broadcastRecents();
-        }
+
         if (xml.includes('infoUpdated')) {
             // Device name changed — re-fetch and broadcast
             try {
@@ -442,27 +440,7 @@ async function broadcastSources() {
     try { broadcast({ type: 'sources', sources: await getSources() }); } catch {}
 }
 
-async function getRecents() {
-    const r = await axios.get(`${speakerUrl()}/recents`, { timeout: 3000 });
-    const items = [];
-    const re = /<recent[^>]*>.*?<contentItem\s([^>]*)>(.*?)<\/contentItem>.*?<\/recent>/gis;
-    let m;
-    while ((m = re.exec(r.data)) !== null && items.length < 5) {
-        const a = n => { const x = m[1].match(new RegExp(`${n}="([^"]*)"`)); return x ? x[1] : ''; };
-        items.push({
-            source:        a('source'),
-            location:      a('location'),
-            sourceAccount: a('sourceAccount'),
-            isPresetable:  a('isPresetable') === 'true',
-            itemName:      decodeXmlEntities(m[2].replace(/<[^>]+>/g, '').trim())
-        });
-    }
-    return items;
-}
 
-async function broadcastRecents() {
-    try { broadcast({ type: 'recents', recents: await getRecents() }); } catch {}
-}
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -773,10 +751,6 @@ app.post('/name', async (req, res) => {
 
 // ─── Stations / Radio ─────────────────────────────────────────────────────────
 
-app.get('/recents', async (req, res) => {
-    try { res.json(await getRecents()); }
-    catch (err) { console.error('/recents:', err.message); res.status(502).send('Error'); }
-});
 
 
 
@@ -1074,12 +1048,14 @@ async function pollSpotifyProgress() {
             timeout: 3000,
         });
         if (r.status === 204 || !r.data) return; // Nothing playing
-        const { progress_ms, duration_ms, is_playing, item } = r.data;
+        const { progress_ms, duration_ms, is_playing, item, shuffle_state, repeat_state } = r.data;
         broadcast({
-            type:        'progress',
-            progress_ms: progress_ms || 0,
-            duration_ms: item?.duration_ms || duration_ms || 0,
+            type:         'progress',
+            progress_ms:  progress_ms || 0,
+            duration_ms:  item?.duration_ms || duration_ms || 0,
             is_playing,
+            shuffle_state: shuffle_state || false,
+            repeat_state:  repeat_state  || 'off',
         });
     } catch (err) {
         if (err.response?.status === 401) {
@@ -1098,12 +1074,11 @@ wss.on('connection', async ws => {
     ws.on('close', () => browserClients.delete(ws));
     // Send current state immediately on connect
     try {
-        const [status, eq, sources, recents] = await Promise.all([getStatus(), getEq(), getSources(), getRecents().catch(() => [])]);
+        const [status, eq, sources] = await Promise.all([getStatus(), getEq(), getSources()]);
         if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'status',  ...status  }));
             ws.send(JSON.stringify({ type: 'eq',       ...eq      }));
             ws.send(JSON.stringify({ type: 'sources',  sources    }));
-            ws.send(JSON.stringify({ type: 'recents',  recents    }));
         }
     } catch {}
 });

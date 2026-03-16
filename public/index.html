@@ -155,8 +155,8 @@
 
   /* ── Transport ─────────────────────────────────────────────────────────── */
   .transport {
-    display: flex; align-items: center; justify-content: center;
-    gap: 32px; margin: clamp(6px, 1.5vh, 10px) 0 clamp(10px, 2.5vh, 18px);
+    display: flex; align-items: center; justify-content: space-between;
+    margin: clamp(6px, 1.5vh, 10px) 0 clamp(10px, 2.5vh, 18px);
   }
   .btn-skip {
     background: none; border: none; cursor: pointer; padding: 8px;
@@ -176,6 +176,26 @@
   .btn-play:active { transform: scale(0.92); box-shadow: 0 2px 10px rgba(0,0,0,0.25); }
   .btn-play svg { width: 30px; height: 30px; fill: #222; margin-left: 3px; }
 
+
+  /* ── Shuffle / Repeat buttons ────────────────────────────────────────────── */
+  .btn-sr {
+    background: none; border: none; cursor: pointer; padding: 8px;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s, opacity 0.12s;
+    opacity: 0.35; flex-shrink: 0;
+  }
+  .btn-sr:active { transform: scale(0.85); opacity: 0.55; }
+  .btn-sr svg {
+    width: clamp(22px, 3.5vh, 28px); height: clamp(22px, 3.5vh, 28px);
+    fill: #333; transition: fill 0.15s, filter 0.15s; display: block;
+  }
+  .btn-sr.active { opacity: 1; }
+  .btn-sr.active svg {
+    fill: #0066ff;
+    filter: drop-shadow(0 0 6px #0044ffcc);
+  }
+  .app.art-mode .btn-sr svg { fill: rgba(255,255,255,0.7); }
+  .app.art-mode .btn-sr.active svg { fill: #0066ff; filter: drop-shadow(0 0 6px #0044ffcc); }
   /* ── Volume ────────────────────────────────────────────────────────────── */
   .volume-row { display: flex; align-items: center; gap: 14px; margin-bottom: clamp(10px, 2.5vh, 20px); padding: 0 4px; }
 
@@ -639,15 +659,29 @@
   <!-- Progress bar & elapsed timer -->
   <!-- Transport -->
   <div class="transport">
+    <!-- Shuffle -->
+    <button class="btn-sr" id="btnShuffle" title="Shuffle" onclick="toggleShuffle()">
+      <svg viewBox="0 0 24 24"><path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+    </button>
+    <!-- Prev -->
     <button class="btn-skip" title="Previous" onclick="api('prev')">
       <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
     </button>
+    <!-- Play/Pause -->
     <button class="btn-play" id="btnPlay" title="Play/Pause" onclick="togglePlay()">
       <svg id="iconPlay"  viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
       <svg id="iconPause" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
     </button>
+    <!-- Next -->
     <button class="btn-skip" title="Next" onclick="api('next')">
       <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
+    </button>
+    <!-- Repeat -->
+    <button class="btn-sr" id="btnRepeat" title="Repeat" onclick="cycleRepeat()">
+      <svg viewBox="0 0 24 24">
+        <path id="iconRepeatAll" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+        <path id="iconRepeatOne" style="display:none" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2v-5h-1l-2 1v1h1.5v3H13z"/>
+      </svg>
     </button>
   </div>
 
@@ -712,15 +746,6 @@
       </button>
     </div>
     <div class="drawer-body">
-
-      <!-- Recents -->
-      <div class="drawer-section">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <span class="drawer-section-label" style="margin-bottom:0">Recently Played</span>
-          <button onclick="clearRecents()" style="background:none;border:none;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.3);padding:4px 0;-webkit-tap-highlight-color:transparent" id="clearRecentsBtn">Clear</button>
-        </div>
-        <ul class="sheet-list" id="recentList"><li><span class="item-name" style="color:rgba(255,255,255,0.3)">Loading…</span></li></ul>
-      </div>
 
       <!-- Stations -->
       <div class="drawer-section" id="stationsSection">
@@ -838,7 +863,6 @@ function connectWS() {
       else if (msg.type === 'eq')      applyEq(msg);
       else if (msg.type === 'sources') { allSources = msg.sources; refreshSourceBadges(); }
       else if (msg.type === 'info')    { document.getElementById('speakerName').textContent = msg.name.toUpperCase(); }
-      else if (msg.type === 'recents') { renderRecents(msg.recents); }
     } catch {}
   };
   ws.onopen  = () => document.getElementById('offlineBanner').classList.remove('show');
@@ -1249,7 +1273,6 @@ async function deleteStation(id) {
 // ── Drawer open/close ────────────────────────────────────────────────────────
 function openDrawer() {
   document.getElementById('drawerOverlay').classList.add('open');
-  loadRecents();
   loadStations();
 }
 
@@ -1266,90 +1289,6 @@ function toggleMute() {
   document.getElementById('iconMuteOn').style.display  = isMuted ? '' : 'none';
   api('mute');
 }
-
-// ── Recents ───────────────────────────────────────────────────────────────────
-const SOURCE_ICONS = {
-  SPOTIFY:              '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.65 14.4c-.2.32-.62.42-.94.22-2.57-1.57-5.8-1.93-9.61-1.06-.37.08-.73-.14-.82-.51-.08-.37.14-.73.51-.82 4.17-.95 7.75-.54 10.63 1.22.32.2.42.62.23.95zm1.24-2.76c-.25.4-.78.52-1.18.28-2.94-1.81-7.43-2.33-10.91-1.28-.45.14-.93-.12-1.07-.57-.13-.45.12-.93.57-1.07 3.98-1.21 8.93-.62 12.31 1.46.4.24.52.78.28 1.18zm.11-2.87C14.25 8.88 8.8 8.7 5.44 9.7c-.54.16-1.11-.14-1.27-.68-.16-.54.14-1.11.68-1.27 3.88-1.18 10.33-.95 14.4 1.47.49.28.65.9.37 1.38-.28.49-.9.65-1.38.37z"/></svg>',
-  INTERNET_RADIO:       '<svg viewBox="0 0 24 24"><path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12h20V8c0-.83-.51-1.57-1.24-1.85L13 3.18c-.62-.24-1.38-.24-2 0L3.24 6.15zM7 18H5v-2h2v2zm0-4H5v-2h2v2zm4 4H9v-2h2v2zm0-4H9v-2h2v2zm4 4h-2v-2h2v2zm0-4h-2v-2h2v2zm2-5c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm2 9h-2v-2h2v2zm0-4h-2v-2h2v2z"/></svg>',
-  LOCAL_INTERNET_RADIO: '<svg viewBox="0 0 24 24"><path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12h20V8c0-.83-.51-1.57-1.24-1.85L13 3.18c-.62-.24-1.38-.24-2 0L3.24 6.15zM7 18H5v-2h2v2zm0-4H5v-2h2v2zm4 4H9v-2h2v2zm0-4H9v-2h2v2zm4 4h-2v-2h2v2zm0-4h-2v-2h2v2zm2-5c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm2 9h-2v-2h2v2zm0-4h-2v-2h2v2z"/></svg>',
-  BLUETOOTH:            '<svg viewBox="0 0 24 24"><path d="M17.71 7.71 12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29z"/></svg>',
-  AUX:                  '<svg viewBox="0 0 24 24"><path d="M19 5h-1V3h-2v2H8V3H6v2H5C3.9 5 3 5.9 3 7v1h18V7c0-1.1-.9-2-2-2z"/></svg>',
-};
-
-let cachedRecents = [];
-
-function renderRecents(recents) {
-  cachedRecents = recents;
-  const list    = document.getElementById('recentList');
-  const clearBtn = document.getElementById('clearRecentsBtn');
-  if (clearBtn) clearBtn.style.display = recents.length ? '' : 'none';
-  if (!recents.length) {
-    list.innerHTML = '<li><span class="item-name" style="color:rgba(255,255,255,0.3)">Nothing played yet</span></li>';
-    return;
-  }
-  list.innerHTML = recents.map((r, i) => {
-    const icon = SOURCE_ICONS[r.source] || SOURCE_ICONS['INTERNET_RADIO'];
-    return `<li onclick="playRecent(${i})">
-      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-        <div class="item-icon" style="flex-shrink:0;opacity:0.6">${icon}</div>
-        <div style="min-width:0">
-          <div class="item-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.itemName || r.source}</div>
-          <div class="item-sub">${r.source.toLowerCase().replace('_',' ')}</div>
-        </div>
-      </div>
-      <div class="item-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-    </li>`;
-  }).join('');
-}
-
-async function clearRecents() {
-  // Speaker has no API to clear recents — just wipe the UI
-  cachedRecents = [];
-  renderRecents([]);
-  document.getElementById('clearRecentsBtn').style.display = 'none';
-}
-
-async function loadRecents() {
-  try {
-    const recents = await fetch('/recents').then(r => r.json());
-    renderRecents(recents);
-  } catch {
-    document.getElementById('recentList').innerHTML = '<li><span class="item-name">Could not load recents</span></li>';
-  }
-}
-
-async function playRecent(i) {
-  const r = cachedRecents[i];
-  if (!r) return;
-  closeDrawer();
-  try {
-    // Spotify recents need the speaker on Spotify Connect first,
-    // then select the specific track — otherwise the speaker ignores the location URI
-    if (r.source === 'SPOTIFY' && r.location) {
-      const spotify = (allSources || []).find(s => s.source === 'SPOTIFY' && s.status === 'READY');
-      // Switch to Spotify source first
-      await fetch('/source', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'SPOTIFY', sourceAccount: spotify?.sourceAccount || r.sourceAccount })
-      });
-      // Wait for Spotify Connect to become active, then select the track
-      await new Promise(r => setTimeout(r, 1500));
-      await fetch('/source', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: r.source, sourceAccount: r.sourceAccount, location: r.location })
-      });
-    } else {
-      await fetch('/source', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: r.source, sourceAccount: r.sourceAccount, location: r.location })
-      });
-    }
-  } catch {}
-}
-
 
 
 // ── Spotify Progress Bar ──────────────────────────────────────────────────────
@@ -1371,6 +1310,8 @@ function applyProgress(msg) {
   spProgressMs  = msg.progress_ms  || 0;
   spDurationMs  = msg.duration_ms  || 0;
   spIsPlaying   = msg.is_playing   || false;
+
+  if (msg.shuffle_state !== undefined) applyShuffleRepeat(msg.shuffle_state, msg.repeat_state || 'off');
 
   document.getElementById('spProgressWrap').classList.add('visible');
   document.getElementById('sourceRow').style.display = 'none';
@@ -1422,6 +1363,44 @@ async function spSeek(e) {
       body: JSON.stringify({ position_ms })
     });
   } catch {}
+}
+
+
+// ── Shuffle / Repeat ──────────────────────────────────────────────────────────
+let shuffleOn  = false;
+let repeatMode = 'off'; // 'off' | 'track' | 'context'
+
+function applyShuffleRepeat(shuffle, repeat) {
+  shuffleOn  = shuffle;
+  repeatMode = repeat;
+
+  const btnS = document.getElementById('btnShuffle');
+  const btnR = document.getElementById('btnRepeat');
+  if (!btnS || !btnR) return;
+
+  btnS.classList.toggle('active', shuffleOn);
+
+  const isRepeat = repeatMode !== 'off';
+  btnR.classList.toggle('active', isRepeat);
+  document.getElementById('iconRepeatAll').style.display = repeatMode === 'track' ? 'none' : '';
+  document.getElementById('iconRepeatOne').style.display = repeatMode === 'track' ? '' : 'none';
+}
+
+function toggleShuffle() {
+  const next = !shuffleOn;
+  api('shuffle/' + (next ? 'on' : 'off'));
+  // Optimistic UI update
+  applyShuffleRepeat(next, repeatMode);
+}
+
+function cycleRepeat() {
+  const states = ['off', 'context', 'track'];
+  const next   = states[(states.indexOf(repeatMode) + 1) % states.length];
+  // Map to speaker key
+  const keyMap = { off: 'off', context: 'all', track: 'one' };
+  api('repeat/' + keyMap[next]);
+  // Optimistic UI update
+  applyShuffleRepeat(shuffleOn, next);
 }
 
 // ── Wi-Fi source popover ──────────────────────────────────────────────────────
