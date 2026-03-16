@@ -121,7 +121,7 @@
   .np-track {
     font-family: 'Barlow Condensed', sans-serif;
     font-weight: 700; font-size: 1.35rem; letter-spacing: 0.04em;
-    color: var(--white); line-height: 1.2; min-height: 1.4em;
+    color: var(--white); line-height: 1.2;
   }
   .np-artist {
     font-size: 0.85rem; font-weight: 400;
@@ -137,6 +137,29 @@
     text-transform: uppercase; color: var(--text-dim);
   }
 
+
+  /* ── Marquee scroll for long track names ─────────────────────────────────── */
+  .marquee-wrap {
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+    width: 100%;
+  }
+  .marquee-inner {
+    display: inline-block;
+    white-space: nowrap;
+    /* animation applied via JS when overflow detected */
+  }
+  @keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    15%  { transform: translateX(0); }          /* pause at start */
+    85%  { transform: translateX(var(--marquee-dist)); }
+    100% { transform: translateX(var(--marquee-dist)); } /* pause at end */
+  }
+  .marquee-inner.scrolling {
+    animation: marquee-scroll var(--marquee-dur, 8s) ease-in-out infinite alternate;
+  }
+  .marquee-inner.paused { animation-play-state: paused; }
   /* ── Progress bar ──────────────────────────────────────────────────────── */
 
   /* ── Source Row ────────────────────────────────────────────────────────── */
@@ -244,7 +267,7 @@
   .source-tabs {
     display: flex; align-items: center;
     background: rgba(200,200,200,0.4); backdrop-filter: blur(8px);
-    border-radius: 14px; padding: 10px 0 8px; margin-bottom: 4px;
+    border-radius: 14px; padding: 12px 0; margin-bottom: 4px;
     position: relative;
   }
   .src-tab {
@@ -261,12 +284,16 @@
     fill: #0066ff;
     filter: drop-shadow(0 0 8px #0044ffcc);
   }
-  .src-tab span {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.65rem;
-    font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
-    color: #333; transition: color 0.15s;
+  /* AUX text-as-icon */
+  .src-tab.aux {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.05rem; font-weight: 700; letter-spacing: 0.12em;
+    color: #333; transition: color 0.15s, filter 0.15s;
   }
-  .src-tab.active span { color: #0066ff; }
+  .src-tab.aux.active {
+    color: #0066ff;
+    filter: drop-shadow(0 0 8px #0044ffcc);
+  }
 
   /* Wi-Fi popover — positioned relative to source-tabs */
   .wifi-popover {
@@ -411,12 +438,12 @@
   .app.art-mode .source-tabs {
     background: rgba(255,255,255,0.12); backdrop-filter: blur(12px);
   }
-  .app.art-mode .src-tab span          { color: rgba(255,255,255,0.55); }
   .app.art-mode .src-tab svg           { fill: rgba(255,255,255,0.55); }
   .app.art-mode .src-tab.wifi svg      { fill: none; color: rgba(255,255,255,0.55); }
   .app.art-mode .src-tab.wifi.active svg { fill: none; color: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
   .app.art-mode .src-tab.active svg    { fill: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
-  .app.art-mode .src-tab.active span   { color: #0066ff; }
+  .app.art-mode .src-tab.aux            { color: rgba(255,255,255,0.55); }
+  .app.art-mode .src-tab.aux.active     { color: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
   .app.art-mode .btn-skip svg          { filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
 
   /* ── Shared list styles (drawer content) ────────────────────────────────── */
@@ -625,7 +652,7 @@
   <div class="art-section" id="artSection">
     <img class="art-img" id="artImg" src="" alt="Album art" crossorigin="anonymous" />
     <div class="art-info">
-      <div class="art-track"  id="artTrack"></div>
+      <div class="marquee-wrap"><div class="marquee-inner art-track" id="artTrack"></div></div>
       <div class="art-artist" id="artArtist"></div>
       <div class="art-album"  id="artAlbum"></div>
     </div>
@@ -635,7 +662,7 @@
   <div class="now-playing-wrap" id="npWrap">
     <div class="now-playing-card">
       <div class="np-label">Now Playing</div>
-      <div class="np-track" id="npTrack"><span class="np-idle">—</span></div>
+      <div class="marquee-wrap"><div class="marquee-inner np-track" id="npTrack"><span class="np-idle">—</span></div></div>
       <div class="np-artist" id="npArtist"></div>
       <div class="np-album"  id="npAlbum"></div>
     </div>
@@ -710,27 +737,10 @@
     </div>
 
     <button class="src-tab bluetooth" id="tabBluetooth" onclick="handleBluetoothTab()">
-      <!-- Bluetooth icon -->
       <svg viewBox="0 0 24 24"><path d="M17.71 7.71 12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
-      <span>Bluetooth</span>
     </button>
 
-    <button class="src-tab aux" id="tabAux" onclick="switchSource('AUX','AUX')">
-      <!-- 3.5mm headphone jack icon -->
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <!-- shaft -->
-        <rect x="11" y="9" width="2" height="11" rx="1"/>
-        <!-- sleeve band -->
-        <rect x="9.5" y="16" width="5" height="2.5" rx="1.25"/>
-        <!-- ring band -->
-        <rect x="9.5" y="12.5" width="5" height="2" rx="1"/>
-        <!-- tip cap -->
-        <ellipse cx="12" cy="9" rx="2.5" ry="1.5"/>
-        <!-- cable loop suggestion at base -->
-        <rect x="10.5" y="19.5" width="3" height="1.5" rx="0.75"/>
-      </svg>
-      <span>AUX</span>
-    </button>
+    <button class="src-tab aux" id="tabAux" onclick="switchSource('AUX','AUX')">AUX</button>
 
     <button class="src-tab wifi" id="tabWifi" onclick="toggleWifiPopover()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -739,7 +749,6 @@
         <path d="M4.5 12.5a11 11 0 0 1 15 0"/>
         <path d="M1 8.5a17 17 0 0 1 22 0"/>
       </svg>
-      <span>Wi-Fi</span>
     </button>
 
   </div>
@@ -906,6 +915,7 @@ function applyStatus(s) {
   isPlaying = s.status === 'PLAY_STATE';
   document.getElementById('iconPlay').style.display  = isPlaying ? 'none' : '';
   document.getElementById('iconPause').style.display = isPlaying ? '' : 'none';
+  isPlaying ? resumeMarquees() : pauseMarquees();
 
   const trackEl  = document.getElementById('npTrack');
   const artistEl = document.getElementById('npArtist');
@@ -928,6 +938,10 @@ function applyStatus(s) {
     artistEl.textContent = '';
     albumEl.textContent  = '';
   }
+
+  const playing = s.status === 'PLAY_STATE';
+  updateMarquee(document.getElementById('npTrack'),  playing);
+  updateMarquee(document.getElementById('artTrack'), playing);
 
 
   // Album art — switch layouts if art availability changed
@@ -1411,6 +1425,39 @@ function cycleRepeat() {
   api('repeat/' + keyMap[next]);
   // Optimistic UI update
   applyShuffleRepeat(shuffleOn, next);
+}
+
+
+// ── Marquee scroll ────────────────────────────────────────────────────────────
+function updateMarquee(el, isPlaying) {
+  if (!el) return;
+  const wrap = el.parentElement;
+  if (!wrap || !wrap.classList.contains('marquee-wrap')) return;
+
+  // Reset first so we can measure
+  el.classList.remove('scrolling', 'paused');
+  el.style.removeProperty('--marquee-dist');
+  el.style.removeProperty('--marquee-dur');
+
+  // Measure overflow after reset
+  requestAnimationFrame(() => {
+    const overflow = el.scrollWidth - wrap.clientWidth;
+    if (overflow > 4) {
+      // Duration scales with distance — ~60px/s, min 4s, max 16s
+      const dur = Math.min(16, Math.max(4, overflow / 60));
+      el.style.setProperty('--marquee-dist', `-${overflow}px`);
+      el.style.setProperty('--marquee-dur', `${dur}s`);
+      el.classList.add('scrolling');
+      if (!isPlaying) el.classList.add('paused');
+    }
+  });
+}
+
+function pauseMarquees() {
+  document.querySelectorAll('.marquee-inner.scrolling').forEach(el => el.classList.add('paused'));
+}
+function resumeMarquees() {
+  document.querySelectorAll('.marquee-inner.scrolling').forEach(el => el.classList.remove('paused'));
 }
 
 // ── Wi-Fi source popover ──────────────────────────────────────────────────────
