@@ -164,7 +164,7 @@
     transition: transform 0.12s, opacity 0.12s;
   }
   .btn-skip:active { transform: scale(0.85); opacity: 0.55; }
-  .btn-skip svg { width: clamp(36px, 6vh, 44px); height: clamp(36px, 6vh, 44px); fill: var(--white); filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3)); }
+  .btn-skip svg { width: clamp(40px, 6.5vh, 50px); height: clamp(40px, 6.5vh, 50px); fill: var(--white); filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3)); }
 
   .btn-play {
     width: clamp(62px, 10vh, 78px); height: clamp(62px, 10vh, 78px); border-radius: 50%;
@@ -374,14 +374,13 @@
   .app.art-mode .now-playing-wrap { display: none; }
 
   .art-img {
-    width: 85%;
-    max-width: 340px;
-    max-height: clamp(160px, 38vh, 340px);
+    width: min(85%, clamp(160px, 38vh, 340px));
     aspect-ratio: 1 / 1;
     object-fit: cover;
     border-radius: 10px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.55);
     display: block;
+    flex-shrink: 0;
   }
 
   .art-info {
@@ -674,7 +673,7 @@
     </button>
     <!-- Next -->
     <button class="btn-skip" title="Next" onclick="api('next')">
-      <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M18 6h-2v12h2zm-3.5 6L6 6v12z"/></svg>
     </button>
     <!-- Repeat -->
     <button class="btn-sr" id="btnRepeat" title="Repeat" onclick="cycleRepeat()">
@@ -717,8 +716,19 @@
     </button>
 
     <button class="src-tab aux" id="tabAux" onclick="switchSource('AUX','AUX')">
-      <!-- 3.5mm jack / line-in icon -->
-      <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18A9 9 0 0 0 12 3zm0 2a7 7 0 0 1 7 7 7 7 0 0 1-7 7 7 7 0 0 1-7-7 7 7 0 0 1 7-7zm0 2a5 5 0 1 0 0 10A5 5 0 0 0 12 7zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm0 1.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>
+      <!-- 3.5mm headphone jack icon -->
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <!-- shaft -->
+        <rect x="11" y="9" width="2" height="11" rx="1"/>
+        <!-- sleeve band -->
+        <rect x="9.5" y="16" width="5" height="2.5" rx="1.25"/>
+        <!-- ring band -->
+        <rect x="9.5" y="12.5" width="5" height="2" rx="1"/>
+        <!-- tip cap -->
+        <ellipse cx="12" cy="9" rx="2.5" ry="1.5"/>
+        <!-- cable loop suggestion at base -->
+        <rect x="10.5" y="19.5" width="3" height="1.5" rx="0.75"/>
+      </svg>
       <span>AUX</span>
     </button>
 
