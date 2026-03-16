@@ -1048,17 +1048,33 @@ async function pollSpotifyProgress() {
             timeout: 3000,
         });
         if (r.status === 204 || !r.data) return; // Nothing playing
-        const { progress_ms, duration_ms, is_playing, item, shuffle_state, repeat_state, context } = r.data;
-        const queue = r.data?.queue || [];
-        const nextTrack = queue[0] ? {
-            name:   queue[0].name,
-            artist: queue[0].artists?.map(a => a.name).join(', ') || '',
-            artUrl: queue[0].album?.images?.[2]?.url || queue[0].album?.images?.[0]?.url || '',
-        } : null;
+        const { progress_ms, duration_ms, is_playing, item, shuffle_state, repeat_state } = r.data;
+        const trackDuration = item?.duration_ms || duration_ms || 0;
+        const remaining     = trackDuration - (progress_ms || 0);
+
+        // Only fetch queue when within 25s of end — avoids unnecessary API calls
+        let nextTrack = null;
+        if (remaining > 0 && remaining <= 25_000) {
+            try {
+                const qr = await axios.get('https://api.spotify.com/v1/me/player/queue', {
+                    headers: { Authorization: 'Bearer ' + token },
+                    timeout: 3000,
+                });
+                const first = qr.data?.queue?.[0];
+                if (first) {
+                    nextTrack = {
+                        name:   first.name,
+                        artist: first.artists?.map(a => a.name).join(', ') || '',
+                        artUrl: first.album?.images?.[2]?.url || first.album?.images?.[0]?.url || '',
+                    };
+                }
+            } catch {}
+        }
+
         broadcast({
-            type:         'progress',
-            progress_ms:  progress_ms || 0,
-            duration_ms:  item?.duration_ms || duration_ms || 0,
+            type:          'progress',
+            progress_ms:   progress_ms || 0,
+            duration_ms:   trackDuration,
             is_playing,
             shuffle_state: shuffle_state || false,
             repeat_state:  repeat_state  || 'off',
