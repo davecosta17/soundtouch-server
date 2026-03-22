@@ -56,6 +56,33 @@ app.use(express.json());
 app.use(express.static('public'));
 
 
+
+// Get the server's LAN IP — used to build location URLs the speaker can reach.
+// Prefers the interface on the same subnet as the speaker.
+// Skips virtual/hotspot adapters (169.254.x.x, 192.168.137.x, etc.)
+function getServerIp() {
+    const os = require('os');
+    const ifaces = os.networkInterfaces();
+    const candidates = [];
+    for (const name of Object.values(ifaces)) {
+        for (const iface of name) {
+            if (iface.family !== 'IPv4' || iface.internal) continue;
+            const ip = iface.address;
+            // Skip link-local and Windows hotspot/ICS virtual adapters
+            if (ip.startsWith('169.254.')) continue;
+            if (ip.startsWith('192.168.137.')) continue;
+            candidates.push(ip);
+        }
+    }
+    // Always prefer the same subnet as the speaker
+    if (speakerIp) {
+        const subnet = speakerIp.split('.').slice(0, 3).join('.');
+        const match = candidates.find(ip => ip.startsWith(subnet));
+        if (match) return match;
+    }
+    return candidates[0] || '127.0.0.1';
+}
+
 // ─── mDNS Discovery ───────────────────────────────────────────────────────────
 // setSpeaker() does ONE thing: record the IP and fire onDiscovered().
 // It has zero other side effects so nothing can interfere with it.
@@ -814,15 +841,17 @@ app.get('/radio-browser/search', async (req, res) => {
 app.post('/radio-browser/play', async (req, res) => {
     const { streamUrl, name, favicon } = req.body;
     if (!streamUrl) return res.status(400).send('streamUrl required');
+    console.log('[RBPlay] serverIp:', getServerIp());
+    console.log('[RBPlay] streamUrl:', streamUrl?.substring(0, 60));
     try {
         const safeName    = (name || 'Radio').replace(/[<>&"]/g, '');
         const safeStream  = streamUrl.startsWith('https://')
-            ? `http://${req.headers.host}/radio/stream-proxy?url=${encodeURIComponent(streamUrl)}`
+            ? `http://${getServerIp()}:3000/radio/stream-proxy?url=${encodeURIComponent(streamUrl)}`
             : streamUrl;
-        const safeImage   = proxyIfHttps(favicon || '', req.headers.host);
+        const safeImage   = proxyIfHttps(favicon || '', `${getServerIp()}:3000`);
         // Use /orion/station pattern — encode all station data as base64
         const stationData = Buffer.from(JSON.stringify({ name: safeName, imageUrl: safeImage, streamUrl: safeStream })).toString('base64');
-        const location    = `http://${req.headers.host}/orion/station?data=${stationData}`;
+        const location    = `http://${getServerIp()}:3000/orion/station?data=${stationData}`;
         const xml = `<ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl" location="${location}" sourceAccount=""><itemName>${safeName}</itemName></ContentItem>`;
         await axios.post(`${speakerUrl()}/select`, xml, XML_H);
         res.send('Playing');
@@ -907,12 +936,15 @@ app.get('/radio/stream-proxy', async (req, res) => {
 
 
 app.get('/orion/station', (req, res) => {
+    console.log('[Orion] Fetched by speaker:', req.url.substring(0, 80));
     try {
         const data = JSON.parse(Buffer.from(req.query.data, 'base64').toString('utf8'));
         const streamUrl = data.streamUrl;
+        console.log('[Orion] streamUrl:', streamUrl);
         if (!streamUrl) return res.status(400).send('no streamUrl in data');
-        // Return the correct Bose station JSON format
-        res.json(boseStationJson(data.name, streamUrl, data.imageUrl || ''));
+        const payload = boseStationJson(data.name, streamUrl, data.imageUrl || '');
+        console.log('[Orion] Returning:', JSON.stringify(payload));
+        res.json(payload);
     } catch (err) {
         console.error('[Orion] Decode error:', err.message);
         res.status(400).send('bad data');
@@ -927,18 +959,23 @@ app.get('/radio/stream-data', (req, res) => {
 });
 
 app.get('/station-data/:id', (req, res) => {
+    console.log('[StationData] Fetched by speaker, id:', req.params.id);
     const s = stations[req.params.id];
-    if (!s) return res.status(404).send('Not found');
-    const imageUrl = proxyIfHttps(s.favicon || '', req.headers.host);
-    res.json(boseStationJson(s.name, s.url, imageUrl));
+    if (!s) { console.log('[StationData] Not found'); return res.status(404).send('Not found'); }
+    const imageUrl = proxyIfHttps(s.favicon || '', `${getServerIp()}:3000`);
+    const payload = boseStationJson(s.name, s.url, imageUrl);
+    console.log('[StationData] Returning:', JSON.stringify(payload));
+    res.json(payload);
 });
 
 app.get('/radio/:id', async (req, res) => {
+    console.log('[Radio] serverIp:', getServerIp());
+    console.log('[Radio] Play request, id:', req.params.id, 'stations:', stations.length);
     const s = stations[req.params.id];
-    if (!s) return res.status(404).send('Not found');
-    const imageUrl    = proxyIfHttps(s.favicon || '', req.headers.host);
+    if (!s) { console.log('[Radio] Station not found'); return res.status(404).send('Not found'); }
+    const imageUrl    = proxyIfHttps(s.favicon || '', `${getServerIp()}:3000`);
     const stationData = Buffer.from(JSON.stringify({ name: s.name, imageUrl, streamUrl: s.url })).toString('base64');
-    const location = `http://${req.headers.host}/orion/station?data=${stationData}`;
+    const location = `http://${getServerIp()}:3000/orion/station?data=${stationData}`;
     const xml = `<ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl" location="${location}" sourceAccount=""><itemName>${s.name}</itemName></ContentItem>`;
     try {
         await axios.post(`${speakerUrl()}/select`, xml, XML_H);
