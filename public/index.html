@@ -427,6 +427,31 @@
     white-space: nowrap; max-width: 260px;
     height: 52px;
   }
+
+  /* ── Country grid ────────────────────────────────────────────────────────── */
+  .country-grid {
+    display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 8px;
+  }
+  .country-pill {
+    padding: 6px 11px; border-radius: 20px;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.65); cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.78rem;
+    font-weight: 600; letter-spacing: 0.05em;
+    transition: background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent; white-space: nowrap;
+  }
+  .country-pill:active, .country-pill.selected {
+    background: #0066ff; border-color: #0066ff; color: #fff;
+  }
+  .country-detected {
+    background: rgba(0,102,255,0.15); border-color: rgba(0,102,255,0.4);
+    color: #7eb8ff;
+  }
+  .country-detected.selected {
+    background: #0066ff; border-color: #0066ff; color: #fff;
+  }
+  .country-browse-results { margin-top: 8px; }
   /* ── Source Tabs ───────────────────────────────────────────────────────── */
   .source-tabs {
     display: flex; align-items: center;
@@ -664,6 +689,46 @@
   .delete-btn:hover { opacity: 0.7; }
   .delete-btn svg { width: 16px; height: 16px; fill: var(--white); display: block; }
 
+
+  /* ── Radio Browser tabs (Search / Browse) ───────────────────────────────── */
+  .rb-tabs {
+    display: flex; gap: 6px; margin-bottom: 14px;
+  }
+  .rb-tab-btn {
+    flex: 1; padding: 8px 0; border-radius: 8px; border: none; cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.78rem;
+    font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.4);
+    transition: background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .rb-tab-btn.active {
+    background: rgba(0,102,255,0.2); color: #0066ff;
+  }
+
+  /* ── Country grid ────────────────────────────────────────────────────────── */
+  .country-grid {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    max-height: 220px; overflow-y: auto;
+    padding-bottom: 4px; margin-bottom: 8px;
+  }
+  .country-pill {
+    padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.78rem;
+    font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);
+    transition: background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent; white-space: nowrap;
+  }
+  .country-pill:active { background: rgba(255,255,255,0.15); }
+  .country-pill.selected {
+    background: rgba(0,102,255,0.25); color: #0066ff;
+    border: 1px solid rgba(0,102,255,0.4);
+  }
+  .country-loading {
+    font-family: 'Barlow', sans-serif; font-size: 0.82rem;
+    color: rgba(255,255,255,0.3); padding: 8px 0; text-align: center;
+  }
   /* ── Radio Browser search ───────────────────────────────────────────────── */
   .rb-search-row {
     display: flex; gap: 8px; margin-bottom: 14px;
@@ -910,15 +975,32 @@
       <div class="drawer-section" id="stationsSection">
         <span class="drawer-section-label">Radio Stations</span>
 
-        <!-- Radio Browser Search -->
-        <div class="rb-search-row">
-          <input class="rb-search-input" id="rbSearchInput" type="search"
-            placeholder="Search stations…" maxlength="80"
-            onkeydown="if(event.key==='Enter') rbSearch()" />
-          <button class="rb-search-btn" id="rbSearchBtn" onclick="rbSearch()">Search</button>
+        <!-- Search / Browse tabs -->
+        <div class="rb-tabs">
+          <button class="rb-tab-btn active" id="rbTabSearch" onclick="rbSwitchTab('search')">Search</button>
+          <button class="rb-tab-btn"        id="rbTabBrowse" onclick="rbSwitchTab('browse')">Browse</button>
         </div>
-        <div class="rb-results" id="rbResults"></div>
-        <hr class="rb-divider" id="rbDivider" style="display:none" />
+
+        <!-- Search panel -->
+        <div id="rbSearchPanel">
+          <div class="rb-search-row">
+            <input class="rb-search-input" id="rbSearchInput" type="search"
+              placeholder="Search stations…" maxlength="80"
+              onkeydown="if(event.key==='Enter') rbSearch()" />
+            <button class="rb-search-btn" id="rbSearchBtn" onclick="rbSearch()">Search</button>
+          </div>
+          <div class="rb-results" id="rbResults"></div>
+          <hr class="rb-divider" id="rbDivider" style="display:none" />
+        </div>
+
+        <!-- Browse panel -->
+        <div id="rbBrowsePanel" style="display:none">
+          <div class="country-grid" id="countryGrid">
+            <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;padding:4px 0">Detecting location…</div>
+          </div>
+          <div class="rb-results" id="countryResults"></div>
+          <hr class="rb-divider" id="countryDivider" style="display:none" />
+        </div>
 
         <!-- Saved Stations -->
         <ul class="sheet-list" id="stationList"><li><span class="item-name">Loading…</span></li></ul>
@@ -1755,6 +1837,205 @@ document.addEventListener('click', e => {
   if (pop && !pop.contains(e.target) && btn && !btn.contains(e.target)) closeWifiPopover();
 });
 
+
+// ── Radio Browser tabs & country browse ──────────────────────────────────────
+
+// Full ISO country list — name + 2-letter code
+const COUNTRIES = [
+  ['Afghanistan','AF'],['Albania','AL'],['Algeria','DZ'],['Angola','AO'],['Argentina','AR'],
+  ['Armenia','AM'],['Australia','AU'],['Austria','AT'],['Azerbaijan','AZ'],['Bahrain','BH'],
+  ['Bangladesh','BD'],['Belarus','BY'],['Belgium','BE'],['Benin','BJ'],['Bolivia','BO'],
+  ['Bosnia','BA'],['Botswana','BW'],['Brazil','BR'],['Bulgaria','BG'],['Burkina Faso','BF'],
+  ['Burundi','BI'],['Cambodia','KH'],['Cameroon','CM'],['Canada','CA'],['Chad','TD'],
+  ['Chile','CL'],['China','CN'],['Colombia','CO'],['Congo','CG'],['Costa Rica','CR'],
+  ['Croatia','HR'],['Cuba','CU'],['Cyprus','CY'],['Czech Republic','CZ'],['Denmark','DK'],
+  ['Dominican Republic','DO'],['DR Congo','CD'],['Ecuador','EC'],['Egypt','EG'],
+  ['El Salvador','SV'],['Estonia','EE'],['Ethiopia','ET'],['Finland','FI'],['France','FR'],
+  ['Gabon','GA'],['Gambia','GM'],['Georgia','GE'],['Germany','DE'],['Ghana','GH'],
+  ['Greece','GR'],['Guatemala','GT'],['Guinea','GN'],["Côte d'Ivoire",'CI'],['Haiti','HT'],
+  ['Honduras','HN'],['Hungary','HU'],['Iceland','IS'],['India','IN'],['Indonesia','ID'],
+  ['Iran','IR'],['Iraq','IQ'],['Ireland','IE'],['Israel','IL'],['Italy','IT'],
+  ['Jamaica','JM'],['Japan','JP'],['Jordan','JO'],['Kazakhstan','KZ'],['Kenya','KE'],
+  ['Kosovo','XK'],['Kuwait','KW'],['Latvia','LV'],['Lebanon','LB'],['Liberia','LR'],
+  ['Libya','LY'],['Lithuania','LT'],['Luxembourg','LU'],['Madagascar','MG'],['Malawi','MW'],
+  ['Malaysia','MY'],['Mali','ML'],['Malta','MT'],['Mauritania','MR'],['Mauritius','MU'],
+  ['Mexico','MX'],['Moldova','MD'],['Morocco','MA'],['Mozambique','MZ'],['Myanmar','MM'],
+  ['Namibia','NA'],['Nepal','NP'],['Netherlands','NL'],['New Zealand','NZ'],['Nicaragua','NI'],
+  ['Niger','NE'],['Nigeria','NG'],['North Macedonia','MK'],['Norway','NO'],['Oman','OM'],
+  ['Pakistan','PK'],['Palestine','PS'],['Panama','PA'],['Paraguay','PY'],['Peru','PE'],
+  ['Philippines','PH'],['Poland','PL'],['Portugal','PT'],['Qatar','QA'],['Romania','RO'],
+  ['Russia','RU'],['Rwanda','RW'],['Saudi Arabia','SA'],['Senegal','SN'],['Serbia','RS'],
+  ['Sierra Leone','SL'],['Singapore','SG'],['Slovakia','SK'],['Slovenia','SI'],
+  ['Somalia','SO'],['South Africa','ZA'],['South Korea','KR'],['South Sudan','SS'],
+  ['Spain','ES'],['Sri Lanka','LK'],['Sudan','SD'],['Sweden','SE'],['Switzerland','CH'],
+  ['Syria','SY'],['Taiwan','TW'],['Tanzania','TZ'],['Thailand','TH'],['Togo','TG'],
+  ['Trinidad','TT'],['Tunisia','TN'],['Turkey','TR'],['Uganda','UG'],['Ukraine','UA'],
+  ['United Arab Emirates','AE'],['United Kingdom','GB'],['United States','US'],
+  ['Uruguay','UY'],['Uzbekistan','UZ'],['Venezuela','VE'],['Vietnam','VN'],['Yemen','YE'],
+  ['Zambia','ZM'],['Zimbabwe','ZW'],
+];
+
+let detectedCountryCode = null;
+let selectedCountryCode = null;
+let countryData         = [];
+let countryActiveIdx    = null;
+
+function rbSwitchTab(tab) {
+  const isSearch = tab === 'search';
+  document.getElementById('rbTabSearch').classList.toggle('active', isSearch);
+  document.getElementById('rbTabBrowse').classList.toggle('active', !isSearch);
+  document.getElementById('rbSearchPanel').style.display = isSearch ? '' : 'none';
+  document.getElementById('rbBrowsePanel').style.display = isSearch ? 'none' : '';
+  if (!isSearch && !document.getElementById('countryGrid').querySelector('.country-pill')) {
+    initCountryGrid();
+  }
+}
+
+function initCountryGrid() {
+  // Try geolocation
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        try {
+          const { latitude: lat, longitude: lon } = pos.coords;
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+            { headers: { 'Accept-Language': 'en' } }
+          ).then(r => r.json());
+          const code = r.address?.country_code?.toUpperCase();
+          if (code) {
+            detectedCountryCode = code;
+          }
+        } catch {}
+        renderCountryGrid();
+      },
+      () => renderCountryGrid() // permission denied or error
+    );
+  } else {
+    renderCountryGrid();
+  }
+}
+
+function renderCountryGrid() {
+  const grid = document.getElementById('countryGrid');
+
+  // Sort: detected country first, then alphabetical
+  const sorted = [...COUNTRIES].sort((a, b) => {
+    if (a[1] === detectedCountryCode) return -1;
+    if (b[1] === detectedCountryCode) return 1;
+    return a[0].localeCompare(b[0]);
+  });
+
+  grid.innerHTML = sorted.map(([name, code]) => {
+    const isDetected = code === detectedCountryCode;
+    const isSelected = code === selectedCountryCode;
+    return `<button class="country-pill${isDetected ? ' country-detected' : ''}${isSelected ? ' selected' : ''}"
+      onclick="browseCountry('${code}', '${name.replace(/'/g, "\'")}', this)">
+      ${name}${isDetected ? ' 📍' : ''}
+    </button>`;
+  }).join('');
+}
+
+async function browseCountry(code, name, btn) {
+  selectedCountryCode = code;
+  countryActiveIdx    = null;
+
+  // Update pill selection
+  document.querySelectorAll('.country-pill').forEach(p => p.classList.remove('selected'));
+  btn.classList.add('selected');
+
+  const results = document.getElementById('countryResults');
+  const divider = document.getElementById('countryDivider');
+  results.innerHTML = `<ul class="sheet-list"><li><span class="item-name" style="color:rgba(255,255,255,0.35)">Loading ${name}…</span></li></ul>`;
+  divider.style.display = 'none';
+
+  // Scroll results into view
+  results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    countryData = await fetch(`/radio-browser/country?code=${code}`).then(r => r.json());
+    if (!countryData.length) {
+      results.innerHTML = `<ul class="sheet-list"><li><span class="item-name" style="color:rgba(255,255,255,0.35)">No stations found for ${name}</span></li></ul>`;
+      return;
+    }
+    renderCountryResults();
+    divider.style.display = '';
+  } catch {
+    results.innerHTML = '<ul class="sheet-list"><li><span class="item-name" style="color:rgba(255,255,255,0.35)">Failed to load — check connection</span></li></ul>';
+  }
+}
+
+function renderCountryResults() {
+  const results = document.getElementById('countryResults');
+  results.innerHTML = `<ul class="sheet-list">${countryData.map((r, i) => {
+    const meta = [
+      r.language || null,
+      r.codec && r.bitrate ? `${r.codec} · ${r.bitrate} kbps` : (r.bitrate ? `${r.bitrate} kbps` : null)
+    ].filter(Boolean).join(' · ');
+    const isOpen = countryActiveIdx === i;
+    const favicon = r.favicon
+      ? `<img class="rb-favicon" src="${r.favicon}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><svg class="rb-favicon-fallback" style="display:none" viewBox="0 0 24 24"><path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12h20V8c0-.83-.51-1.57-1.24-1.85L13 3.18c-.62-.24-1.38-.24-2 0L3.24 6.15z"/></svg>`
+      : `<svg class="rb-favicon-fallback" viewBox="0 0 24 24"><path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12h20V8c0-.83-.51-1.57-1.24-1.85L13 3.18c-.62-.24-1.38-.24-2 0L3.24 6.15z"/></svg>`;
+    return `<li>
+      <div class="rb-result-main" onclick="countryToggle(${i})">
+        <div class="rb-logo-wrap">${favicon}</div>
+        <div class="rb-result-info">
+          <div class="rb-result-name">${r.name}</div>
+          ${meta ? `<div class="rb-result-meta">${meta}</div>` : ''}
+        </div>
+        <div class="rb-chevron ${isOpen ? 'open' : ''}">
+          <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+        </div>
+      </div>
+      <div class="rb-actions ${isOpen ? 'open' : ''}" id="crA${i}">
+        <button class="rb-action-btn play" onclick="rbPlayFrom(countryData, ${i}, 'crA${i}')">▶ Play Now</button>
+        <button class="rb-action-btn save" onclick="rbSaveFrom(countryData, ${i}, 'crA${i}')">+ Save</button>
+      </div>
+    </li>`;
+  }).join('')}</ul>`;
+}
+
+function countryToggle(i) {
+  countryActiveIdx = (countryActiveIdx === i) ? null : i;
+  renderCountryResults();
+}
+
+// Shared play/save helpers used by both search and browse results
+async function rbPlayFrom(data, i, actionsId) {
+  const r = data[i];
+  if (!r) return;
+  closeDrawer();
+  try {
+    await fetch('/radio-browser/play', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ streamUrl: r.streamUrl, name: r.name, favicon: r.favicon || '' })
+    });
+  } catch (err) { console.error('[rbPlayFrom]', err); }
+}
+
+async function rbSaveFrom(data, i, actionsId) {
+  const r = data[i];
+  if (!r) return;
+  const btn = document.querySelector(`#${actionsId} .save`);
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  try {
+    const res = await fetch('/stations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: r.name, url: r.streamUrl, favicon: r.favicon || '' })
+    });
+    if (res.ok) {
+      if (btn) btn.textContent = '✓ Saved';
+      await loadStations();
+    } else {
+      if (btn) { btn.textContent = '+ Save'; btn.disabled = false; }
+    }
+  } catch {
+    if (btn) { btn.textContent = '+ Save'; btn.disabled = false; }
+  }
+}
+
 // ── Radio Browser Search ─────────────────────────────────────────────────────
 let rbData      = [];
 let rbActiveIdx = null;
@@ -1831,18 +2112,7 @@ function rbToggle(i) {
   rbRender();
 }
 
-async function rbPlay(i) {
-  const r = rbData[i];
-  if (!r) return;
-  closeDrawer();
-  try {
-    await fetch('/radio-browser/play', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ streamUrl: r.streamUrl, name: r.name, favicon: r.favicon || '' })
-    });
-  } catch (err) { console.error('[rbPlay]', err); }
-}
+async function rbPlay(i) { await rbPlayFrom(rbData, i, `rbA${i}`); }
 
 async function rbSave(i) {
   const r = rbData[i];

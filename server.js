@@ -838,6 +838,99 @@ app.get('/radio-browser/search', async (req, res) => {
 
 // Play a Radio Browser station.
 // url_resolved is already a direct stream — just wrap HTTPS if needed.
+
+app.get('/radio-browser/country', async (req, res) => {
+    const code = (req.query.code || '').trim().toUpperCase();
+    if (!code) return res.status(400).send('code required');
+    try {
+        const r = await axios.get(
+            `https://all.api.radio-browser.info/json/stations/bycountrycodeexact/${code}`,
+            {
+                params: { limit: 10, hidebroken: true, lastcheckok: 1, order: 'clickcount', reverse: true },
+                headers: { 'User-Agent': 'SoundTouchLocalServer/1.0' },
+                timeout: 8000
+            }
+        );
+        const stations = (r.data || []).map(s => ({
+            name:        s.name,
+            streamUrl:   s.url_resolved || s.url,
+            bitrate:     s.bitrate    || null,
+            codec:       s.codec      || null,
+            country:     s.country    || null,
+            language:    s.language   || null,
+            tags:        s.tags       || null,
+            favicon:     s.favicon    || null,
+            stationuuid: s.stationuuid,
+        }));
+        res.json(stations);
+    } catch (err) {
+        console.error('[RadioBrowser/country]', err.message);
+        res.status(502).send('Country fetch failed');
+    }
+});
+
+
+app.get('/radio-browser/country', async (req, res) => {
+    const code = (req.query.code || '').trim().toUpperCase();
+    if (!code) return res.status(400).send('code required');
+    try {
+        const r = await axios.get(
+            `https://all.api.radio-browser.info/json/stations/bycountrycodeexact/${code}`,
+            {
+                params: { limit: 10, hidebroken: true, lastcheckok: 1, order: 'clickcount', reverse: true },
+                headers: { 'User-Agent': 'SoundTouchLocalServer/1.0' },
+                timeout: 8000
+            }
+        );
+        const stations = (r.data || []).map(s => ({
+            name:        s.name,
+            streamUrl:   s.url_resolved || s.url,
+            bitrate:     s.bitrate    || null,
+            codec:       s.codec      || null,
+            country:     s.country    || null,
+            language:    s.language   || null,
+            tags:        s.tags       || null,
+            favicon:     s.favicon    || null,
+            stationuuid: s.stationuuid,
+        }));
+        res.json(stations);
+    } catch (err) {
+        console.error('[RadioBrowser/country]', err.message);
+        res.status(502).send('Country fetch failed');
+    }
+});
+
+
+app.get('/radio-browser/country', async (req, res) => {
+    const code = (req.query.code || '').toUpperCase().trim();
+    if (!code) return res.status(400).send('code required');
+    try {
+        const r = await axios.get(
+            `https://all.api.radio-browser.info/json/stations/bycountrycodeexact/${code}`,
+            {
+                params: { hidebroken: true, lastcheckok: 1, order: 'clickcount', reverse: true, limit: 10 },
+                headers: { 'User-Agent': 'SoundTouchLocalServer/1.0' },
+                timeout: 8000
+            }
+        );
+        const stations = (r.data || []).map(s => ({
+            name:        s.name,
+            streamUrl:   s.url_resolved || s.url,
+            bitrate:     s.bitrate    || null,
+            codec:       s.codec      || null,
+            country:     s.country    || null,
+            language:    s.language   || null,
+            tags:        s.tags       || null,
+            favicon:     s.favicon    || null,
+            stationuuid: s.stationuuid,
+        }));
+        res.json(stations);
+    } catch (err) {
+        console.error('[RadioBrowser/country]', err.message);
+        res.status(502).send('Country fetch failed');
+    }
+});
+
 app.post('/radio-browser/play', async (req, res) => {
     const { streamUrl, name, favicon } = req.body;
     if (!streamUrl) return res.status(400).send('streamUrl required');
