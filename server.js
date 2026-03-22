@@ -802,17 +802,15 @@ function proxyIfHttps(url, host) {
 // Returns direct stream URLs, no resolution needed. Filters dead streams via lastcheckok.
 
 app.get('/radio-browser/search', async (req, res) => {
-    const q = (req.query.q || '').trim();
+    const q      = (req.query.q      || '').trim();
+    const country = (req.query.country || '').trim().toUpperCase();
     if (!q) return res.status(400).send('q is required');
-    // Radio Browser recommends all.api.radio-browser.info — DNS load balancer
-    // that resolves to whichever server is currently available
     const RB_API = 'https://all.api.radio-browser.info/json/stations/search';
     try {
+        const params = { name: q, limit: 10, hidebroken: true, lastcheckok: 1, order: 'clickcount', reverse: true };
+        if (country) params.countrycodeexact = country;
         const r = await axios.get(RB_API, {
-            params: {
-                name: q, limit: 10, hidebroken: true,
-                lastcheckok: 1, order: 'clickcount', reverse: true
-            },
+            params,
             headers: { 'User-Agent': 'SoundTouchLocalServer/1.0' },
             timeout: 8000
         });
@@ -1271,6 +1269,28 @@ app.delete('/spotify/like', async (req, res) => {
             { headers: { Authorization: 'Bearer ' + token }, data: { ids: [id] } });
         res.send('Unliked');
     } catch (err) { res.status(502).send('Failed'); }
+});
+
+
+// Store a station to a preset slot
+app.post('/preset/store', async (req, res) => {
+    const { num, name, url } = req.body;
+    if (!num || !name || !url) return res.status(400).send('num, name, url required');
+    if (num < 1 || num > 6) return res.status(400).send('num must be 1–6');
+    try {
+        const safeName = (name || '').replace(/[<>&"]/g, '');
+        const imageUrl = proxyIfHttps('', `${getServerIp()}:3000`);
+        const stationData = Buffer.from(JSON.stringify({
+            name: safeName, imageUrl: '', streamUrl: url
+        })).toString('base64');
+        const location = `http://${getServerIp()}:3000/orion/station?data=${stationData}`;
+        const xml = `<preset id="${num}"><ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl" location="${location}" sourceAccount="" isPresetable="true"><itemName>${safeName}</itemName></ContentItem></preset>`;
+        await axios.post(`${speakerUrl()}/storePreset`, xml, XML_H);
+        res.send('Stored');
+    } catch (err) {
+        console.error('[preset/store]', err.message);
+        res.status(502).send('Store failed');
+    }
 });
 
 // ─── HTTP + WebSocket server ───────────────────────────────────────────────────
