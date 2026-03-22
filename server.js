@@ -854,6 +854,18 @@ app.post('/stations', (req, res) => {
     }
 });
 
+// Reorder stations — replace entire array
+app.put('/stations', (req, res) => {
+    const incoming = req.body;
+    if (!Array.isArray(incoming)) return res.status(400).send('Expected array');
+    stations.length = 0;
+    incoming.forEach(s => stations.push(s));
+    try {
+        fs.writeFileSync('stations.json', JSON.stringify(stations, null, 2));
+        res.json(stations);
+    } catch { res.status(500).send('Could not save stations'); }
+});
+
 // Delete a radio station by index
 app.delete('/stations/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);

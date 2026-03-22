@@ -399,6 +399,34 @@
     font-size: 0.75rem; color: rgba(255,255,255,0.45); margin-top: 1px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+
+  /* ── Drag-to-reorder ─────────────────────────────────────────────────────── */
+  .drag-handle {
+    display: flex; align-items: center; justify-content: center;
+    padding: 8px 4px 8px 8px; cursor: grab; flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent; touch-action: none;
+  }
+  .drag-handle svg { width: 16px; height: 16px; fill: rgba(255,255,255,0.2); display: block; }
+  .drag-handle:active { cursor: grabbing; }
+  .station-item.dragging {
+    opacity: 0.4;
+  }
+  .station-item.drag-over {
+    border-top: 2px solid #0066ff;
+  }
+  .drag-ghost {
+    position: fixed; pointer-events: none; z-index: 999;
+    background: rgba(30,30,30,0.97); border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 0 8px; list-style: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    opacity: 0.92; transform: rotate(1.5deg);
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.95rem; font-weight: 600; color: var(--white);
+    white-space: nowrap; max-width: 260px;
+    height: 52px;
+  }
   /* ── Source Tabs ───────────────────────────────────────────────────────── */
   .source-tabs {
     display: flex; align-items: center;
@@ -1207,33 +1235,58 @@ const DSP_LABELS = {
 
 
 // ── Stations panel ────────────────────────────────────────────────────────────
+let stationsData = [];
+
 async function loadStations() {
   try {
-    const stations = await fetch('/stations').then(r => r.json());
-    if (!stations.length) {
-      document.getElementById('stationList').innerHTML = '<li><span class="item-name" style="color:rgba(255,255,255,0.3)">No stations yet — add one below</span></li>';
-      return;
-    }
-    document.getElementById('stationList').innerHTML = stations.map((s, i) => `
-      <li>
-        <span class="item-name" onclick="playStation(${i})" style="flex:1;cursor:pointer">${s.name}</span>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="item-icon" onclick="playStation(${i})" style="cursor:pointer">
-            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-          </div>
-          <button class="delete-btn" onclick="deleteStation(${i})" title="Remove">
-            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-          </button>
-        </div>
-      </li>`).join('');
+    stationsData = await fetch('/stations').then(r => r.json());
+    renderStations();
   } catch {
     document.getElementById('stationList').innerHTML = '<li><span class="item-name">Could not load stations</span></li>';
   }
 }
 
+function renderStations() {
+  const list = document.getElementById('stationList');
+  if (!stationsData.length) {
+    list.innerHTML = '<li><span class="item-name" style="color:rgba(255,255,255,0.3)">No stations yet — add one below</span></li>';
+    return;
+  }
+  list.innerHTML = stationsData.map((s, i) => {
+    const logoHtml = s.favicon
+      ? `<img class="station-favicon" src="${s.favicon}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><svg class="station-favicon-fallback" style="display:none" viewBox="0 0 24 24"><path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12h20V8c0-.83-.51-1.57-1.24-1.85L13 3.18c-.62-.24-1.38-.24-2 0L3.24 6.15z"/></svg>`
+      : `<svg class="station-favicon-fallback" viewBox="0 0 24 24"><path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12h20V8c0-.83-.51-1.57-1.24-1.85L13 3.18c-.62-.24-1.38-.24-2 0L3.24 6.15z"/></svg>`;
+    return `<li class="station-item" data-index="${i}" style="-webkit-tap-highlight-color:transparent">
+      <div class="station-logo-wrap">${logoHtml}</div>
+      <span class="item-name" onclick="playStation(${i})" style="flex:1;cursor:pointer">${s.name}</span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <div class="item-icon" onclick="playStation(${i})" style="cursor:pointer">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+        <button class="delete-btn" onclick="event.stopPropagation();deleteStation(${i})" title="Remove">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+        <div class="drag-handle" onmousedown="dragStart(event,${i})" ontouchstart="dragStart(event,${i})" title="Drag to reorder">
+          <svg viewBox="0 0 24 24"><path d="M9 3h2v2H9zm4 0h2v2h-2zM9 7h2v2H9zm4 0h2v2h-2zM9 11h2v2H9zm4 0h2v2h-2zM9 15h2v2H9zm4 0h2v2h-2zM9 19h2v2H9zm4 0h2v2h-2z"/></svg>
+        </div>
+      </div>
+    </li>`;
+  }).join('');
+}
+
 async function playStation(id) {
   closeDrawer();
   await api(`radio/${id}`);
+}
+
+async function saveStationsOrder() {
+  try {
+    await fetch('/stations', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(stationsData)
+    });
+  } catch {}
 }
 
 async function addStation() {
@@ -1259,6 +1312,88 @@ async function deleteStation(id) {
     await fetch(`/stations/${id}`, { method: 'DELETE' });
     await loadStations();
   } catch { alert('Could not delete station.'); }
+}
+
+
+// ── Drag-to-reorder stations ──────────────────────────────────────────────────
+let dragSrcIdx   = null;
+let dragGhost    = null;
+let dragOffsetY  = 0;
+let dragOffsetX  = 0;
+
+function dragStart(e, idx) {
+  dragSrcIdx = idx;
+  const li   = document.querySelector(`.station-item[data-index="${idx}"]`);
+  if (!li) return;
+
+  const rect = li.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  dragOffsetX = clientX - rect.left;
+  dragOffsetY = clientY - rect.top;
+
+  // Create ghost
+  dragGhost = document.createElement('div');
+  dragGhost.className = 'drag-ghost';
+  dragGhost.textContent = stationsData[idx]?.name || '';
+  dragGhost.style.left  = (rect.left) + 'px';
+  dragGhost.style.top   = (rect.top)  + 'px';
+  dragGhost.style.width = rect.width  + 'px';
+  document.body.appendChild(dragGhost);
+
+  li.classList.add('dragging');
+
+  if (e.touches) {
+    document.addEventListener('touchmove',  dragMove,  { passive: false });
+    document.addEventListener('touchend',   dragEnd,   { once: true });
+  } else {
+    document.addEventListener('mousemove',  dragMove);
+    document.addEventListener('mouseup',    dragEnd,   { once: true });
+  }
+  e.preventDefault();
+}
+
+function dragMove(e) {
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  if (dragGhost) {
+    dragGhost.style.left = (clientX - dragOffsetX) + 'px';
+    dragGhost.style.top  = (clientY - dragOffsetY) + 'px';
+  }
+
+  // Highlight drop target
+  document.querySelectorAll('.station-item').forEach(li => li.classList.remove('drag-over'));
+  const el = document.elementFromPoint(clientX, clientY)?.closest('.station-item');
+  if (el && el.dataset.index != dragSrcIdx) el.classList.add('drag-over');
+
+  e.preventDefault();
+}
+
+function dragEnd(e) {
+  document.removeEventListener('touchmove', dragMove);
+  document.removeEventListener('mousemove', dragMove);
+
+  // Find drop target
+  const clientX = e.touches ? e.changedTouches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.changedTouches[0].clientY : e.clientY;
+  const target  = document.elementFromPoint(clientX, clientY)?.closest('.station-item');
+  const destIdx = target ? parseInt(target.dataset.index) : null;
+
+  // Clean up
+  if (dragGhost) { dragGhost.remove(); dragGhost = null; }
+  document.querySelectorAll('.station-item').forEach(li => {
+    li.classList.remove('dragging', 'drag-over');
+  });
+
+  // Reorder and save
+  if (destIdx !== null && destIdx !== dragSrcIdx) {
+    const item = stationsData.splice(dragSrcIdx, 1)[0];
+    stationsData.splice(destIdx, 0, item);
+    renderStations();
+    saveStationsOrder();
+  }
+
+  dragSrcIdx = null;
 }
 
 // ── Drawer open/close ────────────────────────────────────────────────────────
