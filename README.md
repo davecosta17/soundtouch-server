@@ -50,8 +50,6 @@ The Bose SoundTouch Web API runs entirely over your local network on port 8090. 
 - "Up Next" flyout — slides in from the top 20 seconds before the track ends
 - All Spotify features require a one-time OAuth authorisation (see [Spotify Integration](#spotify-integration))
 
-**EQ (capability-dependent):**
-- Bass, treble, and DSP audio mode controls — only shown when supported by your speaker model
 
 ---
 
@@ -362,15 +360,6 @@ All endpoints on port 3000. HTTP 200 on success, 400 on bad input, 502 on speake
 |---|---|---|---|
 | `/name` | POST | `{ name }` | Rename speaker |
 
-### EQ
-
-| Endpoint | Method | Body | Description |
-|---|---|---|---|
-| `/eq` | GET | — | Current EQ values |
-| `/eq/bass` | POST | `{ value }` | Set bass |
-| `/eq/treble` | POST | `{ value }` | Set treble |
-| `/eq/mode` | POST | `{ mode }` | Set DSP mode |
-
 ### Presets
 
 | Endpoint | Method | Description |
@@ -428,12 +417,12 @@ WebSocket on port 3000. UI connects automatically. All messages are JSON.
 | `type` | Key fields | Description |
 |---|---|---|
 | `status` | `source, wifiType, track, artist, album, stationName, bluetoothDevice, artUrl, status, volume, muted` | Full playback state |
-| `eq` | `bass, treble, dsp` | EQ state (null = not supported) |
+| `eq` | `bass, treble, dsp` | EQ state from speaker — null fields indicate unsupported controls |
 | `sources` | `sources[]` | Sources list |
 | `info` | `name` | Speaker renamed |
 | `progress` | `progress_ms, duration_ms, is_playing, shuffle_state, repeat_state, next_track, track_id` | Spotify playback state (every 2s) |
 
-All event types except `progress` are sent immediately on initial browser connection.
+`status`, `eq`, and `sources` are sent immediately on initial browser connection. The `eq` broadcast is sent for speaker-connected clients that implement EQ controls.
 
 ### How it works internally
 
@@ -469,6 +458,3 @@ Check `http://localhost:3000/spotify/status`. If `connected` is false, open `htt
 
 The progress bar only shows during active Spotify Connect playback. Make sure you have started playback from the Spotify app to the speaker. The poller starts automatically once the server detects Spotify as the active source.
 
-**EQ controls not showing**
-
-EQ is capability-gated — the server checks `/capabilities` and `/bassCapabilities` at startup. If the drawer has no EQ section, your speaker model does not expose EQ controls via the API.

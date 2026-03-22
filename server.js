@@ -645,7 +645,6 @@ app.post('/source', async (req, res) => {
     } else if (source === 'AUX') {
         xml = `<ContentItem source="AUX" sourceAccount="${sourceAccount || 'AUX'}"></ContentItem>`;
     } else if (location) {
-        // Full content item for recents with known location (Spotify, radio, etc.)
         const acct = sourceAccount ? ` sourceAccount="${sourceAccount}"` : '';
         xml = `<ContentItem source="${source}" location="${location}"${acct} isPresetable="false"></ContentItem>`;
     } else {
@@ -782,7 +781,6 @@ app.get('/radio-browser/search', async (req, res) => {
     // that resolves to whichever server is currently available
     const RB_API = 'https://all.api.radio-browser.info/json/stations/search';
     try {
-        console.log(`[RadioBrowser] Searching: "${q}" via ${RB_API}`);
         const r = await axios.get(RB_API, {
             params: {
                 name: q, limit: 10, hidebroken: true,
@@ -791,7 +789,6 @@ app.get('/radio-browser/search', async (req, res) => {
             headers: { 'User-Agent': 'SoundTouchLocalServer/1.0' },
             timeout: 8000
         });
-        console.log(`[RadioBrowser] Got ${r.data?.length ?? 0} results`);
         const stations = (r.data || []).map(s => ({
             name:        s.name,
             streamUrl:   s.url_resolved || s.url,
@@ -875,7 +872,6 @@ app.delete('/stations/:id', (req, res) => {
 app.get('/radio/stream-proxy', async (req, res) => {
     const url = req.query.url;
     if (!url) return res.status(400).send('url required');
-    console.log(`[StreamProxy] Piping: ${url}`);
     try {
         const upstream = await axios.get(url, {
             responseType: 'stream',
@@ -897,28 +893,11 @@ app.get('/radio/stream-proxy', async (req, res) => {
     }
 });
 
-// ── Debug logger — logs all requests to metadata endpoints ───────────────────
-app.use((req, res, next) => {
-    if (req.path.startsWith('/station-data') || req.path.startsWith('/radio/') || req.path.startsWith('/orion/')) {
-        console.log(`[SpeakerFetch] ${req.method} ${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`);
-        console.log(`[SpeakerFetch] Accept: ${req.headers['accept'] || 'none'}`);
-        console.log(`[SpeakerFetch] User-Agent: ${req.headers['user-agent'] || 'none'}`);
-        const origJson = res.json.bind(res);
-        const origSend = res.send.bind(res);
-        res.json = (body) => { console.log('[SpeakerFetch] Response (JSON):', JSON.stringify(body)); return origJson(body); };
-        res.send = (body) => { console.log('[SpeakerFetch] Response (send):', String(body).substring(0, 200)); return origSend(body); };
-    }
-    next();
-});
 
-// Replicates the Bose cloud endpoint the speaker originally used.
-// Speaker sends GET /orion/station?data=<base64 encoded JSON>
-// We decode it and return the streamUrl as plain text — the simplest possible response.
 app.get('/orion/station', (req, res) => {
     try {
         const data = JSON.parse(Buffer.from(req.query.data, 'base64').toString('utf8'));
         const streamUrl = data.streamUrl;
-        console.log(`[Orion] Decoded station: ${data.name} -> ${streamUrl}`);
         if (!streamUrl) return res.status(400).send('no streamUrl in data');
         // Return the correct Bose station JSON format
         res.json(boseStationJson(data.name, streamUrl, data.imageUrl || ''));
@@ -932,7 +911,6 @@ app.get('/orion/station', (req, res) => {
 app.get('/radio/stream-data', (req, res) => {
     const { url, name, imageUrl } = req.query;
     if (!url) return res.status(400).send('url required');
-    console.log(`[StreamData] url: ${url}, name: ${name}, imageUrl: ${imageUrl || 'none'}`);
     res.json(boseStationJson(name || 'Radio', url, imageUrl || ''));
 });
 
@@ -940,7 +918,6 @@ app.get('/station-data/:id', (req, res) => {
     const s = stations[req.params.id];
     if (!s) return res.status(404).send('Not found');
     const imageUrl = proxyIfHttps(s.favicon || '', req.headers.host);
-    console.log(`[StationData] ${s.name} -> ${s.url}, image: ${imageUrl || 'none'}`);
     res.json(boseStationJson(s.name, s.url, imageUrl));
 });
 

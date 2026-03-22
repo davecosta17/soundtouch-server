@@ -515,10 +515,6 @@
     color: rgba(255,255,255,0.3); margin-bottom: 12px; display: block;
   }
 
-  .not-supported {
-    font-size: 0.85rem; color: rgba(255,255,255,0.3);
-    text-align: center; padding: 20px 0; font-style: italic;
-  }
 
   /* ── Background colour overlay ──────────────────────────────────────────── */
   #bgOverlay {
@@ -596,57 +592,17 @@
     font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
     color: var(--white);
   }
-  .sheet-list li .item-sub {
-    font-size: 0.75rem; color: rgba(255,255,255,0.35);
-    margin-top: 2px; letter-spacing: 0.03em;
-  }
+  .sheet-list li
+
   .sheet-list li .item-right { display: flex; align-items: center; gap: 8px; }
-  .sheet-list li .badge {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.65rem;
-    font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-    background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.45);
-    padding: 2px 7px; border-radius: 4px;
-  }
-  .sheet-list li .badge.ready     { background: rgba(74,158,255,0.15); color: var(--accent); }
-  .sheet-list li .badge.active-src { background: rgba(74,158,255,0.25); color: var(--accent); }
+  .sheet-list li
+
+  .sheet-list li
+
+  .sheet-list li
+
   .item-icon svg { width: 16px; height: 16px; fill: rgba(255,255,255,0.25); }
 
-  /* ── EQ styles ───────────────────────────────────────────────────────────── */
-  .eq-section { margin-bottom: 24px; }
-  .eq-label {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.65rem;
-    font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase;
-    color: rgba(255,255,255,0.35); margin-bottom: 14px; display: block;
-  }
-  .eq-slider-row { display: flex; align-items: center; gap: 12px; }
-  .eq-slider-label {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.8rem;
-    font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-    color: rgba(255,255,255,0.5); width: 44px;
-  }
-  .eq-slider-val {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.85rem;
-    font-weight: 700; color: var(--white); width: 28px; text-align: right;
-  }
-  .eq-slider-row input[type=range] {
-    background: linear-gradient(to right, rgba(255,255,255,0.5) var(--pct,50%), rgba(255,255,255,0.12) var(--pct,50%));
-  }
-  .eq-slider-row input[type=range]::-webkit-slider-thumb { background: var(--white); }
-
-  .dsp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .dsp-btn {
-    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px; color: rgba(255,255,255,0.55);
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.8rem;
-    font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-    padding: 12px; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .dsp-btn.active {
-    background: rgba(74,158,255,0.15); border-color: rgba(74,158,255,0.4);
-    color: var(--accent);
-  }
-  .dsp-btn:active { opacity: 0.6; }
 
   /* ── Add station form ────────────────────────────────────────────────────── */
   .add-station-form { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 18px; margin-top: 8px; }
@@ -946,7 +902,6 @@
         </div>
       </div>
 
-      <!-- Sources and EQ removed — accessible via source tabs and main UI -->
 
     </div>
   </div>
@@ -1035,8 +990,7 @@ function connectWS() {
       const msg = JSON.parse(e.data);
       if      (msg.type === 'status')  applyStatus(msg);
       else if (msg.type === 'progress') applyProgress(msg);
-      else if (msg.type === 'eq')      applyEq(msg);
-      else if (msg.type === 'sources') { allSources = msg.sources; refreshSourceBadges(); }
+      else if (msg.type === 'sources') { allSources = msg.sources; }
       else if (msg.type === 'info')    { document.getElementById('speakerName').textContent = msg.name.toUpperCase(); }
     } catch {}
   };
@@ -1147,7 +1101,6 @@ function applyStatus(s) {
   }
 
   // Refresh source list badges if panel open
-  refreshSourceBadges();
 }
 
 // ── Speaker Name ─────────────────────────────────────────────────────────────
@@ -1200,49 +1153,8 @@ function onNameKey(e) {
 }
 
 // ── Capabilities ─────────────────────────────────────────────────────────────
-async function loadCapabilities() {
-  try {
-    speakerCaps = await fetch('/capabilities').then(r => r.json());
-    buildEqPanel();
-  } catch {}
-}
-loadCapabilities();
 
-function buildEqPanel() {
-  const { hasToneControls, hasDspControls, bass } = speakerCaps;
-  const anyEq = bass.available || hasToneControls || hasDspControls;
 
-  document.getElementById('eqNotSupported').style.display = anyEq ? 'none' : '';
-
-  // Bass-only controls (when no tone controls)
-  const bassSection = document.getElementById('eqBassSection');
-  if (bass.available && !hasToneControls) {
-    bassSection.style.display = '';
-    const sl = document.getElementById('bassSlider');
-    sl.min = bass.min; sl.max = bass.max;
-    loadBass();
-  } else {
-    bassSection.style.display = 'none';
-  }
-
-  // Tone controls (bass + treble via /tone)
-  const toneSection = document.getElementById('eqToneSection');
-  if (hasToneControls) {
-    toneSection.style.display = '';
-    loadTone();
-  } else {
-    toneSection.style.display = 'none';
-  }
-
-  // DSP modes
-  const dspSection = document.getElementById('eqDspSection');
-  if (hasDspControls) {
-    dspSection.style.display = '';
-    loadDsp();
-  } else {
-    dspSection.style.display = 'none';
-  }
-}
 
 // ── API helpers ───────────────────────────────────────────────────────────────
 async function api(endpoint) {
@@ -1275,128 +1187,24 @@ function onVolumeInput(val) {
 function setVolume(val) { api(`volume/${val}`); }
 
 // ── EQ ────────────────────────────────────────────────────────────────────────
-function eqPct(val, min, max) { return `${((val - min) / (max - min)) * 100}%`; }
 
-function onEqInput(type, slider) {
-  const valEl = document.getElementById({ bass: 'bassVal', toneBass: 'toneBassVal', toneTreble: 'toneTrebleVal' }[type]);
-  if (valEl) { valEl.textContent = slider.value; slider.style.setProperty('--pct', eqPct(Number(slider.value), Number(slider.min), Number(slider.max))); }
-}
 
-async function loadBass() {
-  try {
-    const d = await fetch('/bass').then(r => r.json());
-    const sl = document.getElementById('bassSlider');
-    sl.value = d.current;
-    sl.style.setProperty('--pct', eqPct(d.current, d.min, d.max));
-    document.getElementById('bassVal').textContent = d.current;
-  } catch {}
-}
 
-async function setBass(val) {
-  try { await fetch('/bass', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: val }) }); }
-  catch {}
-}
 
-async function loadTone() {
-  try {
-    const d = await fetch('/tone').then(r => r.json());
-    if (d.bass) {
-      const bs = document.getElementById('toneBassSlider');
-      bs.min = d.bass.min; bs.max = d.bass.max; bs.step = d.bass.step; bs.value = d.bass.value;
-      bs.style.setProperty('--pct', eqPct(d.bass.value, d.bass.min, d.bass.max));
-      document.getElementById('toneBassVal').textContent = d.bass.value;
-    }
-    if (d.treble) {
-      const ts = document.getElementById('toneTrebleSlider');
-      ts.min = d.treble.min; ts.max = d.treble.max; ts.step = d.treble.step; ts.value = d.treble.value;
-      ts.style.setProperty('--pct', eqPct(d.treble.value, d.treble.min, d.treble.max));
-      document.getElementById('toneTrebleVal').textContent = d.treble.value;
-    }
-  } catch {}
-}
 
-async function setTone(type, val) {
-  try {
-    await fetch('/tone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [type]: val }) });
-  } catch {}
-}
 
 const DSP_LABELS = {
   AUDIO_MODE_NORMAL: 'Normal', AUDIO_MODE_DIALOG: 'Dialog',
   AUDIO_MODE_NIGHT: 'Night',   AUDIO_MODE_DIRECT: 'Direct'
 };
 
-async function loadDsp() {
-  try {
-    const d = await fetch('/dsp').then(r => r.json());
-    currentDspMode = d.mode;
-    const grid = document.getElementById('dspGrid');
-    grid.innerHTML = d.supported.map(m => `
-      <button class="dsp-btn ${m === d.mode ? 'active' : ''}" id="dsp_${m}" onclick="setDsp('${m}')">
-        ${DSP_LABELS[m] || m}
-      </button>`).join('');
-  } catch {}
-}
 
-async function setDsp(mode) {
-  try {
-    await fetch('/dsp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
-    // Optimistic UI
-    document.querySelectorAll('.dsp-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(`dsp_${mode}`)?.classList.add('active');
-    currentDspMode = mode;
-  } catch {}
-}
 
 // ── Sources panel ─────────────────────────────────────────────────────────────
-async function loadSources() {
-  try {
-    allSources = await fetch('/sources').then(r => r.json());
-    renderSourceList();
-  } catch {
-    document.getElementById('sourceList').innerHTML = '<li><span class="item-name">Could not load sources</span></li>';
-  }
-}
 
-function renderSourceList() {
-  const list = document.getElementById('sourceList');
-  if (!allSources.length) { list.innerHTML = '<li><span class="item-name">No sources found</span></li>'; return; }
 
-  list.innerHTML = allSources.map((s, i) => {
-    const isActive = isSourceActive(s);
-    const isReady  = s.status === 'READY';
-    return `
-      <li onclick="pickSource(${i})" style="${!isReady ? 'opacity:0.4;cursor:default' : ''}">
-        <div>
-          <div class="item-name">${s.name}</div>
-          <div class="item-sub">${s.source}${s.sourceAccount ? ' · ' + s.sourceAccount : ''}</div>
-        </div>
-        <div class="item-right">
-          ${isActive ? '<span class="badge active-src">Active</span>' : ''}
-          ${isReady  ? '<span class="badge ready">Ready</span>' : '<span class="badge">Unavailable</span>'}
-        </div>
-      </li>`;
-  }).join('');
-}
 
-function isSourceActive(s) {
-  if (!currentSource) return false;
-  if (s.source === 'BLUETOOTH' && currentSource === 'bluetooth') return true;
-  if (s.source === 'AUX' && currentSource === 'aux') return true;
-  if (['INTERNET_RADIO','LOCAL_INTERNET_RADIO','SPOTIFY','AIRPLAY'].includes(s.source) && currentSource === 'wifi') return true;
-  return false;
-}
 
-function refreshSourceBadges() {
-  if (allSources.length) renderSourceList();
-}
-
-async function pickSource(i) {
-  const s = allSources[i];
-  if (!s || s.status !== 'READY') return;
-  closeDrawer();
-  await switchSource(s.source, s.sourceAccount);
-}
 
 // ── Stations panel ────────────────────────────────────────────────────────────
 async function loadStations() {
