@@ -66,17 +66,37 @@ The Bose SoundTouch Web API runs entirely over your local network on port 8090. 
 
 ```
 soundtouch-server/
-├── server.js               # Main server — API logic, discovery, WebSocket bridge
+├── server.js               # Entry point — Express setup, WebSocket server, boots everything
 ├── package.json            # Dependencies
 ├── .env                    # Spotify credentials — not in repo, create from .env.example
 ├── .env.example            # Template for .env
 ├── stations.json           # Saved radio stations (created automatically if missing)
 ├── speaker-cache.json      # Auto-generated — not in repo, stores last known speaker IP
 ├── spotify-tokens.json     # Auto-generated — not in repo, stores Spotify OAuth tokens
+├── lib/
+│   ├── state.js            # All shared mutable server state
+│   ├── helpers.js          # XML parsing, speaker URL, status parsing, helpers
+│   ├── discovery.js        # mDNS queries, subnet scanner, IP cache
+│   ├── speaker.js          # Speaker WebSocket bridge, capabilities, broadcast
+│   ├── spotify.js          # Token management, progress poller
+│   └── routes/
+│       ├── playback.js     # Playback, volume, EQ, sources, presets, status routes
+│       ├── radio.js        # Stations, radio browser, stream proxy, preset store
+│       └── spotify.js      # OAuth, queue, liked songs, setup routes
 └── public/
-    ├── index.html          # Web interface
+    ├── index.html          # Web interface — HTML structure only
     ├── manifest.json       # PWA manifest
     ├── sw.js               # Service worker for offline support
+    ├── css/
+    │   └── style.css       # All styles
+    ├── js/
+    │   ├── state.js        # Shared UI state (ES module)
+    │   ├── ws.js           # WebSocket connection and message routing
+    │   ├── ui.js           # Art mode, background, marquee, rename, drawer
+    │   ├── playback.js     # Transport, volume, mute, source switching
+    │   ├── spotify.js      # Progress, seek, liked songs, queue, setup wizard
+    │   ├── radio.js        # Stations, presets, drag-reorder, radio browser
+    │   └── main.js         # Event binding and app boot
     └── icons/
         ├── icon-192.png    # PWA icon
         └── icon-512.png    # PWA icon
@@ -457,4 +477,3 @@ Check `http://localhost:3000/spotify/status`. If `connected` is false, open `htt
 **Spotify progress bar not appearing**
 
 The progress bar only shows during active Spotify Connect playback. Make sure you have started playback from the Spotify app to the speaker. The poller starts automatically once the server detects Spotify as the active source.
-

@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="theme-color" content="#1a1a1a" />
+  <meta charset="UTF-8" />
+  <meta name="theme-color" content="#1a1a1a" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -10,827 +10,14 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>SoundTouch</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --top-dark:  #1a1a1a;
-    --mid-grey:  #888888;
-    --bot-light: #d4d4d4;
-    --accent:    #4a9eff;
-    --white:     #ffffff;
-    --text-dim:  rgba(255,255,255,0.45);
-    --shadow:    0 4px 20px rgba(0,0,0,0.35);
-  }
-
-  html, body { height: 100%; overflow: hidden; overflow-x: hidden; }
-  * { max-width: 100%; }
-
-  body {
-    font-family: 'Barlow', sans-serif;
-    background: linear-gradient(180deg, var(--top-dark) 0%, #555 45%, var(--bot-light) 100%);
-    display: flex;
-    justify-content: center;
-    min-height: 100svh;
-  }
-
-  .app {
-    width: 100%;
-    max-width: 420px;
-    min-height: 100svh;
-    display: flex;
-    flex-direction: column;
-    padding: max(env(safe-area-inset-top), clamp(12px, 3vh, 20px)) clamp(16px, 5vw, 28px) max(env(safe-area-inset-bottom), clamp(8px, 2vh, 12px));
-  }
-
-  /* ── Top Bar ───────────────────────────────────────────────────────────── */
-  .top-bar {
-    display: grid;
-    grid-template-columns: 48px 1fr 48px;
-    align-items: center;
-    padding-top: 8px;
-    margin-bottom: 4px;
-  }
-
-  .icon-btn {
-    background: none; border: none; cursor: pointer; padding: 8px;
-    display: flex; align-items: center; justify-content: center;
-    opacity: 0.9; transition: opacity 0.15s, transform 0.12s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .icon-btn:active { transform: scale(0.88); opacity: 0.6; }
-  #btnPower.on svg { fill: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
-  .icon-btn svg { width: 28px; height: 28px; fill: var(--white); }
-
-  .speaker-name {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700; font-size: 1.15rem; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--white);
-    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .speaker-name { cursor: pointer; }
-  .speaker-name:active { opacity: 0.6; }
-
-  .name-edit-wrap {
-    display: none; flex-direction: column; align-items: center; gap: 4px;
-  }
-  .name-edit-wrap.active { display: flex; }
-  .name-input {
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
-    font-size: 1.15rem; letter-spacing: 0.1em; text-transform: uppercase;
-    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.4);
-    border-radius: 6px; color: var(--white); text-align: center;
-    padding: 3px 10px; outline: none; width: 180px;
-  }
-  .name-edit-hint {
-    font-size: 0.65rem; color: rgba(255,255,255,0.4); letter-spacing: 0.06em;
-  }
-
-  .status-line {
-    text-align: center; font-size: 0.8rem; font-weight: 300;
-    letter-spacing: 0.06em; color: var(--text-dim);
-    margin-top: 2px; height: 18px;
-  }
-
-  /* ── Now Playing ───────────────────────────────────────────────────────── */
-  .now-playing-wrap {
-    flex: 1; display: flex; align-items: center;
-    justify-content: center; padding: clamp(10px, 3vh, 24px) 0 clamp(4px, 1vh, 8px);
-  }
-  .now-playing-card {
-    width: 100%;
-    border: 2px solid rgba(255,255,255,0.55);
-    background: rgba(255,255,255,0.07);
-    backdrop-filter: blur(6px);
-    padding: clamp(12px, 2.5vh, 20px) clamp(14px, 4vw, 24px); text-align: center;
-    position: relative; overflow: hidden;
-  }
-  .now-playing-card::before {
-    content: ''; position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 60%);
-    pointer-events: none;
-  }
-  .np-label {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.18em;
-    text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px;
-  }
-  .np-track {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700; font-size: 1.35rem; letter-spacing: 0.04em;
-    color: var(--white); line-height: 1.2;
-  }
-  .np-artist {
-    font-size: 0.85rem; font-weight: 400;
-    color: rgba(255,255,255,0.65); margin-top: 4px; min-height: 1.2em;
-  }
-  .np-album {
-    font-size: 0.72rem; font-weight: 300; letter-spacing: 0.03em;
-    color: rgba(255,255,255,0.35); margin-top: 3px; min-height: 1em;
-  }
-  .np-idle {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 600; font-size: 1.1rem; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--text-dim);
-  }
-
-
-  /* ── Marquee scroll for long track names ─────────────────────────────────── */
-  .marquee-wrap {
-    overflow: hidden;
-    white-space: nowrap;
-    position: relative;
-    width: 100%;
-  }
-  .marquee-inner {
-    display: inline-block;
-    white-space: nowrap;
-    /* animation applied via JS when overflow detected */
-  }
-  @keyframes marquee-scroll {
-    0%   { transform: translateX(0); }
-    15%  { transform: translateX(0); }          /* pause at start */
-    85%  { transform: translateX(var(--marquee-dist)); }
-    100% { transform: translateX(var(--marquee-dist)); } /* pause at end */
-  }
-  .marquee-inner.scrolling {
-    animation: marquee-scroll var(--marquee-dur, 8s) ease-in-out infinite alternate;
-  }
-  .marquee-inner.paused { animation-play-state: paused; }
-  /* ── Progress bar ──────────────────────────────────────────────────────── */
-
-  /* ── Source Row ────────────────────────────────────────────────────────── */
-  .source-row {
-    display: flex; align-items: center; justify-content: center;
-    position: relative; margin: clamp(8px, 2vh, 18px) 0 clamp(3px, 1vh, 6px);
-  }
-  .source-label { font-size: 0.85rem; font-weight: 300; letter-spacing: 0.08em; color: rgba(40,40,40,0.75); }
-  .settings-btn {
-    position: absolute; right: 0; background: none; border: none;
-    cursor: pointer; padding: 6px; -webkit-tap-highlight-color: transparent;
-    transition: transform 0.3s;
-  }
-  .settings-btn:active { transform: rotate(45deg); }
-  .settings-btn svg { width: 26px; height: 26px; fill: rgba(30,30,30,0.6); }
-
-  /* ── Transport ─────────────────────────────────────────────────────────── */
-  .transport {
-    display: flex; align-items: center; justify-content: space-between;
-    margin: clamp(6px, 1.5vh, 10px) 0 clamp(10px, 2.5vh, 18px);
-  }
-  .btn-skip {
-    background: none; border: none; cursor: pointer; padding: 8px;
-    -webkit-tap-highlight-color: transparent;
-    transition: transform 0.12s, opacity 0.12s;
-  }
-  .btn-skip:active { transform: scale(0.85); opacity: 0.55; }
-  .btn-skip svg { width: clamp(40px, 6.5vh, 50px); height: clamp(40px, 6.5vh, 50px); fill: var(--white); filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3)); }
-
-  .btn-play {
-    width: clamp(62px, 10vh, 78px); height: clamp(62px, 10vh, 78px); border-radius: 50%;
-    background: var(--white); border: none; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: var(--shadow); -webkit-tap-highlight-color: transparent;
-    transition: transform 0.12s, box-shadow 0.12s; flex-shrink: 0;
-  }
-  .btn-play:active { transform: scale(0.92); box-shadow: 0 2px 10px rgba(0,0,0,0.25); }
-  .btn-play svg { width: 30px; height: 30px; fill: #222; margin-left: 3px; }
-
-
-  /* ── Shuffle / Repeat buttons ────────────────────────────────────────────── */
-  .btn-sr {
-    background: none; border: none; cursor: pointer; padding: 8px;
-    -webkit-tap-highlight-color: transparent;
-    transition: transform 0.12s, opacity 0.12s;
-    opacity: 0.35; flex-shrink: 0;
-  }
-  .btn-sr:active { transform: scale(0.85); opacity: 0.55; }
-  .btn-sr svg {
-    width: clamp(22px, 3.5vh, 28px); height: clamp(22px, 3.5vh, 28px);
-    fill: #333; transition: fill 0.15s, filter 0.15s; display: block;
-  }
-  .btn-sr.active { opacity: 1; }
-  .btn-sr.active svg {
-    fill: #0066ff;
-    filter: drop-shadow(0 0 6px #0044ffcc);
-  }
-  .app.art-mode .btn-sr svg { fill: rgba(255,255,255,0.7); }
-  .app.art-mode .btn-sr.active svg { fill: #0066ff; filter: drop-shadow(0 0 6px #0044ffcc); }
-  /* ── Volume ────────────────────────────────────────────────────────────── */
-  .volume-row { display: flex; align-items: center; gap: 14px; margin-bottom: clamp(10px, 2.5vh, 20px); padding: 0 4px; }
-
-  input[type=range] {
-    -webkit-appearance: none; appearance: none; flex: 1; height: 3px;
-    border-radius: 2px; outline: none; cursor: pointer;
-    background: linear-gradient(to right, rgba(30,30,30,0.5) var(--pct,10%), rgba(30,30,30,0.18) var(--pct,10%));
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
-    background: #2a2a2a; box-shadow: 0 1px 6px rgba(0,0,0,0.25); cursor: pointer;
-    transition: transform 0.1s;
-  }
-  input[type=range]:active::-webkit-slider-thumb { transform: scale(1.25); }
-  input[type=range]::-moz-range-thumb {
-    width: 18px; height: 18px; border-radius: 50%;
-    background: #2a2a2a; border: none; cursor: pointer;
-  }
-
-
-  /* ── Spotify Progress Bar ──────────────────────────────────────────────── */
-  .sp-progress-wrap {
-    display: none; flex-direction: column; gap: 5px;
-    margin: 10px 0 4px; padding: 0 2px;
-  }
-  .sp-progress-wrap.visible { display: flex; }
-  .sp-bar-row {
-    position: relative; height: 3px; background: rgba(0,0,0,0.18);
-    border-radius: 2px; cursor: pointer;
-  }
-  .app.art-mode .sp-bar-row { background: rgba(255,255,255,0.2); }
-  .sp-bar-fill {
-    height: 100%; border-radius: 2px;
-    background: #0066ff; width: 0%;
-    transition: width 1s linear;
-    pointer-events: none;
-  }
-  .sp-bar-row:active .sp-bar-fill { transition: none; }
-  .sp-time-row {
-    display: flex; justify-content: space-between;
-    font-family: 'Barlow', sans-serif; font-size: 0.68rem;
-    color: rgba(30,30,30,0.5); letter-spacing: 0.02em;
-  }
-  .app.art-mode .sp-time-row { color: rgba(255,255,255,0.45); }
-
-
-  /* ── Heart / Liked button ────────────────────────────────────────────────── */
-  .btn-heart {
-    display: none; background: none; border: none; cursor: pointer;
-    padding: 6px; -webkit-tap-highlight-color: transparent;
-    transition: opacity 0.15s, transform 0.12s;
-    flex-shrink: 0;
-  }
-  .btn-heart.visible { display: block; }
-  .btn-heart:active { transform: scale(0.85); }
-  .btn-heart svg { width: 22px; height: 22px; display: block; }
-  /* Hollow heart — faded */
-  .btn-heart .heart-empty {
-    fill: none; stroke: rgba(255,255,255,0.25); stroke-width: 2;
-    transition: stroke 0.2s;
-  }
-  .app:not(.art-mode) .btn-heart .heart-empty { stroke: rgba(30,30,30,0.35); }
-  /* Filled heart — active / liked */
-  .btn-heart .heart-filled {
-    display: none;
-    fill: #0066ff; filter: drop-shadow(0 0 6px #0044ffcc);
-  }
-  .btn-heart.liked .heart-empty { display: none; }
-  .btn-heart.liked .heart-filled { display: block; }
-  /* ── Queue icon button ───────────────────────────────────────────────────── */
-  .btn-queue {
-    display: none; background: none; border: none; cursor: pointer;
-    padding: 6px; -webkit-tap-highlight-color: transparent;
-    transition: opacity 0.15s;
-    flex-shrink: 0;
-  }
-  .btn-queue.visible { display: block; }
-  .btn-queue:active { opacity: 0.6; }
-  .btn-queue svg { width: 22px; height: 22px; display: block; fill: rgba(255,255,255,0.75); }
-  .app:not(.art-mode) .btn-queue svg { fill: rgba(30,30,30,0.65); }
-
-  /* ── Queue right drawer ──────────────────────────────────────────────────── */
-  .queue-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
-    z-index: 200;
-  }
-  .queue-overlay.open { display: block; }
-  .queue-drawer {
-    position: fixed; top: 0; right: 0; bottom: 0;
-    width: 82%; max-width: 340px;
-    background: #181818; z-index: 201;
-    display: flex; flex-direction: column;
-    transform: translateX(100%);
-    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
-    overflow: hidden;
-  }
-  .queue-overlay.open .queue-drawer { transform: translateX(0); }
-  .queue-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 20px; cursor: pointer;
-    transition: background 0.15s; -webkit-tap-highlight-color: transparent;
-  }
-  .queue-item:active { background: rgba(255,255,255,0.06); }
-  .queue-item-num {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.75rem;
-    font-weight: 600; color: rgba(255,255,255,0.25); width: 16px;
-    text-align: center; flex-shrink: 0;
-  }
-  .queue-item-art {
-    width: 42px; height: 42px; border-radius: 4px;
-    object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08);
-  }
-  .queue-item-info { min-width: 0; flex: 1; }
-  .queue-item-name {
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 600;
-    font-size: 0.95rem; letter-spacing: 0.04em; color: var(--white);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .queue-item-artist {
-    font-size: 0.75rem; color: rgba(255,255,255,0.4); margin-top: 2px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-
-  /* ── Skip confirmation ───────────────────────────────────────────────────── */
-  .queue-confirm {
-    display: none; position: fixed; inset: 0; z-index: 300;
-    align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
-  }
-  .queue-confirm.open { display: flex; }
-  .queue-confirm-box {
-    background: #222; border-radius: 16px; padding: 24px 20px;
-    width: 80%; max-width: 300px; text-align: center;
-  }
-  .queue-confirm-msg {
-    font-family: 'Barlow', sans-serif; font-size: 0.9rem;
-    color: rgba(255,255,255,0.7); margin-bottom: 20px; line-height: 1.5;
-  }
-  .queue-confirm-btns { display: flex; gap: 10px; }
-  .queue-confirm-btn {
-    flex: 1; padding: 12px 0; border-radius: 10px; border: none;
-    cursor: pointer; font-family: 'Barlow Condensed', sans-serif;
-    font-size: 0.85rem; font-weight: 700; letter-spacing: 0.08em;
-    text-transform: uppercase; -webkit-tap-highlight-color: transparent;
-  }
-  .queue-confirm-btn.cancel { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
-  .queue-confirm-btn.ok     { background: #0066ff; color: #fff; }
-
-  /* ── Up Next flyout ──────────────────────────────────────────────────────── */
-  .upnext-flyout {
-    position: fixed; top: 0; left: 50%; transform: translateX(-50%) translateY(-100%);
-    z-index: 400; width: 90%; max-width: 380px;
-    background: rgba(24,24,24,0.96); backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 0 0 16px 16px; padding: 12px 16px;
-    display: flex; align-items: center; gap: 12px;
-    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
-    pointer-events: none;
-  }
-  .upnext-flyout.show { transform: translateX(-50%) translateY(0); pointer-events: auto; }
-  .upnext-art {
-    width: 44px; height: 44px; border-radius: 6px;
-    object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08);
-  }
-  .upnext-info { min-width: 0; flex: 1; }
-  .upnext-label {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.6rem;
-    font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase;
-    color: rgba(255,255,255,0.35); margin-bottom: 3px;
-  }
-  .upnext-name {
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
-    font-size: 1rem; letter-spacing: 0.04em; color: var(--white);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .upnext-artist {
-    font-size: 0.75rem; color: rgba(255,255,255,0.45); margin-top: 1px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-
-
-  /* ── Presets ─────────────────────────────────────────────────────────────── */
-  .preset-grid {
-    display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
-    margin-bottom: 4px;
-  }
-  .preset-tile {
-    position: relative; aspect-ratio: 1/1;
-    border-radius: 10px; border: none; cursor: pointer;
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.1);
-    display: flex; align-items: center; justify-content: center;
-    -webkit-tap-highlight-color: transparent;
-    transition: background 0.15s, border-color 0.15s;
-    overflow: hidden; padding: 0;
-  }
-  .preset-tile:active { background: rgba(255,255,255,0.14); }
-  .preset-tile.filled {
-    background: rgba(255,255,255,0.1);
-    border-color: rgba(255,255,255,0.18);
-  }
-  .preset-tile.filled:active { background: rgba(0,102,255,0.25); border-color: #0066ff; }
-  .preset-tile-plus {
-    font-size: 1.3rem; color: rgba(255,255,255,0.2); line-height: 1;
-  }
-  .preset-tile-name {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.6rem;
-    font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-    color: var(--white); padding: 4px; text-align: center; line-height: 1.2;
-    word-break: break-word; hyphens: auto;
-  }
-  .preset-tile-num {
-    position: absolute; bottom: 3px; right: 5px;
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.6rem;
-    font-weight: 700; color: rgba(255,255,255,0.3); line-height: 1;
-  }
-  .preset-tile.filled .preset-tile-num { color: rgba(255,255,255,0.4); }
-  /* ── Drag-to-reorder ─────────────────────────────────────────────────────── */
-  .drag-handle {
-    display: flex; align-items: center; justify-content: center;
-    padding: 8px 4px 8px 8px; cursor: grab; flex-shrink: 0;
-    -webkit-tap-highlight-color: transparent; touch-action: none;
-  }
-  .drag-handle svg { width: 16px; height: 16px; fill: rgba(255,255,255,0.2); display: block; }
-  .drag-handle:active { cursor: grabbing; }
-  .station-item.dragging {
-    opacity: 0.4;
-  }
-  .station-item.drag-over {
-    border-top: 2px solid #0066ff;
-  }
-  .drag-ghost {
-    position: fixed; pointer-events: none; z-index: 999;
-    background: rgba(30,30,30,0.97); border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.15);
-    padding: 0 8px; list-style: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    opacity: 0.92; transform: rotate(1.5deg);
-    display: flex; align-items: center; gap: 10px;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 0.95rem; font-weight: 600; color: var(--white);
-    white-space: nowrap; max-width: 260px;
-    height: 52px;
-  }
-
-  /* ── Country grid ────────────────────────────────────────────────────────── */
-  .country-grid {
-    display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 8px;
-  }
-  .country-pill {
-    padding: 6px 11px; border-radius: 20px;
-    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.65); cursor: pointer;
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.78rem;
-    font-weight: 600; letter-spacing: 0.05em;
-    transition: background 0.15s, color 0.15s;
-    -webkit-tap-highlight-color: transparent; white-space: nowrap;
-  }
-  .country-pill:active, .country-pill.selected {
-    background: #0066ff; border-color: #0066ff; color: #fff;
-  }
-  .country-detected {
-    background: rgba(0,102,255,0.15); border-color: rgba(0,102,255,0.4);
-    color: #7eb8ff;
-  }
-  .country-detected.selected {
-    background: #0066ff; border-color: #0066ff; color: #fff;
-  }
-  .country-browse-results { margin-top: 8px; }
-  /* ── Source Tabs ───────────────────────────────────────────────────────── */
-  .source-tabs {
-    display: flex; align-items: center;
-    background: rgba(200,200,200,0.4); backdrop-filter: blur(8px);
-    border-radius: 14px; padding: 12px 0; margin-bottom: 4px;
-    position: relative;
-  }
-  .src-tab {
-    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
-    background: none; border: none; cursor: pointer; padding: 4px 0;
-    border-radius: 8px; -webkit-tap-highlight-color: transparent;
-    transition: opacity 0.15s, filter 0.15s; opacity: 0.35; position: relative;
-  }
-  .src-tab.active { opacity: 1; }
-  .src-tab svg { width: 26px; height: 26px; fill: #333; transition: fill 0.15s, filter 0.15s; }
-  .src-tab.wifi svg { fill: none; color: #333; }
-  .src-tab.wifi.active svg { fill: none; color: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
-  .src-tab.active svg {
-    fill: #0066ff;
-    filter: drop-shadow(0 0 8px #0044ffcc);
-  }
-  /* AUX text-as-icon */
-  .src-tab.aux {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 1.05rem; font-weight: 700; letter-spacing: 0.12em;
-    color: #333; transition: color 0.15s, filter 0.15s;
-  }
-  .src-tab.aux.active {
-    color: #0066ff;
-    filter: drop-shadow(0 0 8px #0044ffcc);
-  }
-
-  /* Wi-Fi popover — positioned relative to source-tabs */
-  .wifi-popover {
-    display: none; position: absolute;
-    bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
-    background: rgba(28,28,32,0.97); backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
-    padding: 6px; min-width: 180px; z-index: 200;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  }
-  .wifi-popover.open { display: block; }
-  .wifi-popover::after {
-    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-    border: 7px solid transparent; border-top-color: rgba(28,28,32,0.97);
-  }
-  .wifi-popover-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 11px 14px; border-radius: 10px; cursor: pointer;
-    transition: background 0.15s; -webkit-tap-highlight-color: transparent;
-  }
-  .wifi-popover-item:active { background: rgba(255,255,255,0.1); }
-  .wifi-popover-item svg { width: 20px; height: 20px; flex-shrink: 0; fill: rgba(255,255,255,0.6); }
-  .wifi-popover-item span {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.95rem;
-    font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-    color: rgba(255,255,255,0.85);
-  }
-  .wifi-popover-item.spotify svg { fill: #1DB954; }
-  .wifi-popover-item.radio svg   { fill: #4a9eff; }
-
-  /* ── Offline Banner ────────────────────────────────────────────────────── */
-  .offline-banner {
-    display: none; position: fixed; top: 0; left: 0; right: 0;
-    background: rgba(0,0,0,0.75); color: rgba(255,255,255,0.7);
-    text-align: center; font-size: 0.75rem; letter-spacing: 0.08em;
-    padding: 6px; z-index: 100;
-  }
-  .offline-banner.show { display: block; }
-
-  /* ── Drawer CSS kept in drawer block below ──────────────────────────────── */
-  /* ── Hamburger drawer ───────────────────────────────────────────────────── */
-  .drawer-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
-    z-index: 200;
-  }
-  .drawer-overlay.open { display: block; }
-  .drawer {
-    position: fixed; top: 0; left: 0; bottom: 0;
-    width: 82%; max-width: 340px;
-    background: #181818; z-index: 201;
-    display: flex; flex-direction: column;
-    transform: translateX(-100%);
-    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
-    overflow: hidden;
-  }
-  .drawer-overlay.open .drawer { transform: translateX(0); }
-  .drawer-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 20px 20px 14px; flex-shrink: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-  }
-  .drawer-title {
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
-    font-size: 1rem; letter-spacing: 0.15em; text-transform: uppercase;
-    color: rgba(255,255,255,0.5);
-  }
-  .drawer-close {
-    background: none; border: none; cursor: pointer; padding: 4px;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .drawer-close svg { width: 22px; height: 22px; fill: rgba(255,255,255,0.4); display: block; }
-  .drawer-body { flex: 1; overflow-y: auto; padding: 0 0 32px; }
-  .drawer-section { padding: 20px 20px 0; }
-  .drawer-section + .drawer-section {
-    margin-top: 8px; padding-top: 20px;
-    border-top: 1px solid rgba(255,255,255,0.07);
-  }
-  .drawer-section-label {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.62rem;
-    font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase;
-    color: rgba(255,255,255,0.3); margin-bottom: 12px; display: block;
-  }
-
-
-  /* ── Background colour overlay ──────────────────────────────────────────── */
-  #bgOverlay {
-    position: fixed; inset: 0; z-index: 0;
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.9s ease, background 0.9s ease;
-  }
-  .app { position: relative; z-index: 1; }
-
-  /* ── Art section ─────────────────────────────────────────────────────────── */
-  .art-section {
-    display: none; flex-direction: column; align-items: center;
-    padding: clamp(6px, 1.5vh, 12px) 0 0; flex: 1;
-  }
-  .app.art-mode .art-section    { display: flex; }
-  .app.art-mode .now-playing-wrap { display: none; }
-
-  .art-img {
-    width: min(85%, clamp(160px, 38vh, 340px));
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-    border-radius: 10px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.55);
-    display: block;
-    flex-shrink: 0;
-  }
-
-  .art-info {
-    width: 85%; max-width: 340px;
-    margin-top: 14px; text-align: center;
-  }
-  .art-track {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700; font-size: 1.45rem; letter-spacing: 0.04em;
-    color: var(--white); line-height: 1.2;
-  }
-  .art-artist {
-    font-size: 0.9rem; font-weight: 400;
-    color: rgba(255,255,255,0.7); margin-top: 5px;
-  }
-  .art-album {
-    font-size: 0.75rem; font-weight: 300; letter-spacing: 0.03em;
-    color: rgba(255,255,255,0.42); margin-top: 3px;
-  }
-
-  /* ── Art-mode: adapt bottom controls to dark background ─────────────────── */
-  .app.art-mode .source-label          { color: rgba(255,255,255,0.75); }
-  .app.art-mode .settings-btn svg      { fill: rgba(255,255,255,0.7); }
-  .app.art-mode input[type=range] {
-    background: linear-gradient(to right, rgba(255,255,255,0.75) var(--pct,10%), rgba(255,255,255,0.2) var(--pct,10%));
-  }
-  .app.art-mode input[type=range]::-webkit-slider-thumb { background: var(--white); }
-  .app.art-mode .source-tabs {
-    background: rgba(255,255,255,0.12); backdrop-filter: blur(12px);
-  }
-  .app.art-mode .src-tab svg           { fill: rgba(255,255,255,0.55); }
-  .app.art-mode .src-tab.wifi svg      { fill: none; color: rgba(255,255,255,0.55); }
-  .app.art-mode .src-tab.wifi.active svg { fill: none; color: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
-  .app.art-mode .src-tab.active svg    { fill: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
-  .app.art-mode .src-tab.aux            { color: rgba(255,255,255,0.55); }
-  .app.art-mode .src-tab.aux.active     { color: #0066ff; filter: drop-shadow(0 0 8px #0044ffcc); }
-  .app.art-mode .btn-skip svg          { filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
-
-  /* ── Shared list styles (drawer content) ────────────────────────────────── */
-  .sheet-list { list-style: none; }
-  .sheet-list li {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 13px 0; border-bottom: 1px solid rgba(255,255,255,0.07);
-    cursor: pointer; transition: opacity 0.15s;
-  }
-  .sheet-list li:last-child { border-bottom: none; }
-  .sheet-list li:active { opacity: 0.5; }
-  .sheet-list li .item-name {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 1rem;
-    font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--white);
-  }
-  .sheet-list li
-
-  .sheet-list li .item-right { display: flex; align-items: center; gap: 8px; }
-  .sheet-list li
-
-  .sheet-list li
-
-  .sheet-list li
-
-  .item-icon svg { width: 16px; height: 16px; fill: rgba(255,255,255,0.25); }
-
-
-  /* ── Add station form ────────────────────────────────────────────────────── */
-  .add-station-form { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 18px; margin-top: 8px; }
-  .form-label {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.65rem;
-    font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase;
-    color: rgba(255,255,255,0.35); display: block; margin-bottom: 10px;
-  }
-  .form-input {
-    width: 100%; background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
-    color: var(--white); font-family: 'Barlow', sans-serif;
-    font-size: 0.9rem; padding: 10px 12px; margin-bottom: 8px; outline: none;
-    transition: border-color 0.15s;
-  }
-  .form-input:focus { border-color: rgba(255,255,255,0.35); }
-  .form-input::placeholder { color: rgba(255,255,255,0.25); }
-  .btn-add-station {
-    width: 100%; background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
-    color: var(--white); font-family: 'Barlow Condensed', sans-serif;
-    font-size: 0.8rem; font-weight: 600; letter-spacing: 0.1em;
-    text-transform: uppercase; padding: 11px; cursor: pointer;
-    transition: background 0.15s; margin-top: 2px;
-  }
-  .btn-add-station:active { background: rgba(255,255,255,0.18); }
-  .delete-btn {
-    background: none; border: none; cursor: pointer; padding: 4px 6px;
-    opacity: 0.35; transition: opacity 0.15s; flex-shrink: 0;
-  }
-  .delete-btn:hover { opacity: 0.7; }
-  .delete-btn svg { width: 16px; height: 16px; fill: var(--white); display: block; }
-
-
-  /* ── Radio Browser tabs (Search / Browse) ───────────────────────────────── */
-
-  /* ── Country grid ────────────────────────────────────────────────────────── */
-  .country-grid {
-    display: flex; flex-wrap: wrap; gap: 6px;
-    max-height: 220px; overflow-y: auto;
-    padding-bottom: 4px; margin-bottom: 8px;
-  }
-  .country-pill {
-    padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer;
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.78rem;
-    font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);
-    transition: background 0.15s, color 0.15s;
-    -webkit-tap-highlight-color: transparent; white-space: nowrap;
-  }
-  .country-pill:active { background: rgba(255,255,255,0.15); }
-  .country-pill.selected {
-    background: rgba(0,102,255,0.25); color: #0066ff;
-    border: 1px solid rgba(0,102,255,0.4);
-  }
-  .country-loading {
-    font-family: 'Barlow', sans-serif; font-size: 0.82rem;
-    color: rgba(255,255,255,0.3); padding: 8px 0; text-align: center;
-  }
-  /* ── Radio Browser search ───────────────────────────────────────────────── */
-  .rb-search-row {
-    display: flex; gap: 8px; margin-bottom: 14px;
-  }
-  .rb-search-input {
-    flex: 1; background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
-    color: var(--white); font-family: 'Barlow', sans-serif;
-    font-size: 0.9rem; padding: 9px 12px; outline: none;
-    transition: border-color 0.15s;
-  }
-  .rb-search-input:focus { border-color: rgba(255,255,255,0.35); }
-  .rb-search-input::placeholder { color: rgba(255,255,255,0.25); }
-  .rb-search-btn {
-    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 8px; color: var(--white); cursor: pointer; padding: 9px 14px;
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.8rem;
-    font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-    transition: background 0.15s; flex-shrink: 0;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .rb-search-btn:active { background: rgba(255,255,255,0.2); }
-  .rb-search-btn:disabled { opacity: 0.4; cursor: default; }
-  .rb-results { margin-bottom: 8px; }
-  .rb-results .sheet-list li { flex-direction: column; align-items: stretch; }
-  .rb-result-main {
-    display: flex; align-items: center; justify-content: space-between; width: 100%;
-  }
-  .rb-result-info { min-width: 0; flex: 1; }
-  .rb-result-name {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 1rem;
-    font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .rb-result-meta { font-size: 0.72rem; color: rgba(255,255,255,0.35); margin-top: 2px; }
-  .rb-chevron svg {
-    width: 16px; height: 16px; fill: rgba(255,255,255,0.25);
-    transition: transform 0.2s; flex-shrink: 0; margin-left: 8px;
-  }
-  .rb-chevron.open svg { transform: rotate(180deg); }
-  .rb-actions { display: none; gap: 8px; padding: 10px 0 4px; }
-  .rb-actions.open { display: flex; }
-  .rb-action-btn {
-    flex: 1; padding: 9px 0; border-radius: 8px; border: none; cursor: pointer;
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.8rem;
-    font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-    -webkit-tap-highlight-color: transparent; transition: opacity 0.15s;
-  }
-  .rb-action-btn:active { opacity: 0.7; }
-  .rb-action-btn.play { background: var(--accent); color: var(--white); }
-  .rb-action-btn.save { background: rgba(255,255,255,0.1); color: var(--white); border: 1px solid rgba(255,255,255,0.15); }
-  .rb-divider { border: none; border-top: 1px solid rgba(255,255,255,0.07); margin: 8px 0 16px; }
-  /* ── Radio Browser results ───────────────────────────────────────────────── */
-  .rb-logo-wrap {
-    width: 36px; height: 36px; flex-shrink: 0; margin-right: 10px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .rb-favicon {
-    width: 36px; height: 36px; border-radius: 6px; object-fit: cover;
-    background: rgba(255,255,255,0.06);
-  }
-  .rb-favicon-fallback { width: 20px; height: 20px; fill: rgba(255,255,255,0.25); }
-
-  /* Saved stations with favicon */
-  .station-logo-wrap {
-    width: 32px; height: 32px; flex-shrink: 0; margin-right: 10px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .station-favicon {
-    width: 32px; height: 32px; border-radius: 5px; object-fit: cover;
-  }
-  .station-favicon-fallback { width: 18px; height: 18px; fill: rgba(255,255,255,0.25); }
-
-
-</style>
+  <title>SoundTouch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
 
-<!-- Dynamic colour overlay — sits behind everything, fades in with album art -->
+<!-- Dynamic colour overlay -->
 <div id="bgOverlay"></div>
 
 <div class="offline-banner" id="offlineBanner">SPEAKER OFFLINE — RETRYING…</div>
@@ -839,43 +26,49 @@
 
   <!-- Top Bar -->
   <div class="top-bar">
-    <button class="icon-btn" title="Menu" onclick="openDrawer()">
-      <svg viewBox="0 0 28 25" xmlns="http://www.w3.org/2000/svg"><rect x="18.5" y="0" width="3" height="8" rx="1.5"/><rect x="0" y="6" width="28" height="19" rx="4"/><circle cx="20" cy="15.5" r="6.5" fill="white" opacity="0.92"/><circle cx="5.5" cy="10.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="15.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="20.5" r="2" fill="white" opacity="0.92"/><circle cx="10"  cy="10.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10"  cy="15.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10"  cy="20.5" r="2.2" fill="white" opacity="0.92"/></svg>
+    <button class="icon-btn" title="Menu">
+      <svg viewBox="0 0 28 25" xmlns="http://www.w3.org/2000/svg">
+        <rect x="18.5" y="0" width="3" height="8" rx="1.5"/>
+        <rect x="0" y="6" width="28" height="19" rx="4"/>
+        <circle cx="20" cy="15.5" r="6.5" fill="white" opacity="0.92"/>
+        <circle cx="5.5" cy="10.5" r="2" fill="white" opacity="0.92"/>
+        <circle cx="5.5" cy="15.5" r="2" fill="white" opacity="0.92"/>
+        <circle cx="5.5" cy="20.5" r="2" fill="white" opacity="0.92"/>
+        <circle cx="10"  cy="10.5" r="2.2" fill="white" opacity="0.92"/>
+        <circle cx="10"  cy="15.5" r="2.2" fill="white" opacity="0.92"/>
+        <circle cx="10"  cy="20.5" r="2.2" fill="white" opacity="0.92"/>
+      </svg>
     </button>
     <div style="text-align:center">
-      <div class="speaker-name" id="speakerName" onclick="startRename()" title="Tap to rename">SOUNDTOUCH</div>
+      <div class="speaker-name" id="speakerName" title="Tap to rename">SOUNDTOUCH</div>
       <div class="name-edit-wrap" id="nameEditWrap">
-        <input class="name-input" id="nameInput" type="text" maxlength="30"
-          onkeydown="onNameKey(event)" onblur="cancelRename()" />
+        <input class="name-input" id="nameInput" type="text" maxlength="30" />
         <span class="name-edit-hint">Enter to save · Esc to cancel</span>
       </div>
       <div class="status-line" id="statusLine">Connecting…</div>
     </div>
-    <button class="icon-btn" id="btnPower" title="Power" onclick="api('power')">
+    <button class="icon-btn" id="btnPower" title="Power">
       <svg viewBox="0 0 24 24"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42A6.92 6.92 0 0 1 19 12c0 3.87-3.13 7-7 7A7 7 0 0 1 5 12c0-2.28 1.09-4.3 2.58-5.42L6.17 5.17A8.932 8.932 0 0 0 3 12a9 9 0 0 0 18 0c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
     </button>
   </div>
 
-  <!-- Art Section — shown when album art is available -->
+  <!-- Art Section -->
   <div class="art-section" id="artSection">
     <img class="art-img" id="artImg" src="" alt="Album art" crossorigin="anonymous" />
     <div class="art-info">
       <div class="marquee-wrap"><div class="marquee-inner art-track" id="artTrack"></div></div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
-        <!-- Heart — left -->
-        <button class="btn-heart" id="btnHeart" onclick="toggleLike()" title="Like">
+        <button class="btn-heart" id="btnHeart" title="Like">
           <svg viewBox="0 0 24 24">
             <path class="heart-empty" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             <path class="heart-filled" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
           </svg>
         </button>
-        <!-- Artist / Album — centre -->
         <div style="flex:1;min-width:0;text-align:center;padding:0 8px">
           <div class="art-artist" id="artArtist"></div>
           <div class="art-album"  id="artAlbum"></div>
         </div>
-        <!-- Queue — right -->
-        <button class="btn-queue" id="btnQueue" onclick="openQueueDrawer()" title="Queue">
+        <button class="btn-queue" id="btnQueue" title="Queue">
           <svg viewBox="0 0 24 20" xmlns="http://www.w3.org/2000/svg">
             <rect x="1" y="0.5" width="22" height="6" rx="3" ry="3" fill="none" stroke="#0066ff" stroke-width="1.8"/>
             <rect x="1" y="9.5" width="22" height="4" rx="2" ry="2"/>
@@ -886,7 +79,7 @@
     </div>
   </div>
 
-  <!-- Now Playing card — shown when no album art -->
+  <!-- Now Playing card -->
   <div class="now-playing-wrap" id="npWrap">
     <div class="now-playing-card">
       <div class="np-label">Now Playing</div>
@@ -896,12 +89,12 @@
     </div>
   </div>
 
-  <!-- Source Row / Progress Bar — mutually exclusive -->
+  <!-- Source Row / Progress Bar -->
   <div class="source-row" id="sourceRow">
     <span class="source-label" id="sourceLabel">Source</span>
   </div>
   <div class="sp-progress-wrap" id="spProgressWrap">
-    <div class="sp-bar-row" id="spBarRow" onclick="spSeek(event)">
+    <div class="sp-bar-row" id="spBarRow">
       <div class="sp-bar-fill" id="spBarFill"></div>
     </div>
     <div class="sp-time-row">
@@ -910,28 +103,22 @@
     </div>
   </div>
 
-  <!-- Progress bar & elapsed timer -->
   <!-- Transport -->
   <div class="transport">
-    <!-- Shuffle -->
-    <button class="btn-sr" id="btnShuffle" title="Shuffle" onclick="toggleShuffle()">
+    <button class="btn-sr" id="btnShuffle" title="Shuffle">
       <svg viewBox="0 0 24 24"><path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
     </button>
-    <!-- Prev -->
-    <button class="btn-skip" title="Previous" onclick="api('prev')">
+    <button class="btn-skip" title="Previous">
       <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
     </button>
-    <!-- Play/Pause -->
-    <button class="btn-play" id="btnPlay" title="Play/Pause" onclick="togglePlay()">
+    <button class="btn-play" id="btnPlay" title="Play/Pause">
       <svg id="iconPlay"  viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
       <svg id="iconPause" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
     </button>
-    <!-- Next -->
-    <button class="btn-skip" title="Next" onclick="api('next')">
+    <button class="btn-skip" title="Next">
       <svg viewBox="0 0 24 24"><path d="M18 6h-2v12h2zm-3.5 6L6 6v12z"/></svg>
     </button>
-    <!-- Repeat -->
-    <button class="btn-sr" id="btnRepeat" title="Repeat" onclick="cycleRepeat()">
+    <button class="btn-sr" id="btnRepeat" title="Repeat">
       <svg viewBox="0 0 24 24">
         <path id="iconRepeatAll" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
         <path id="iconRepeatOne" style="display:none" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2v-5h-1l-2 1v1h1.5v3H13z"/>
@@ -941,36 +128,40 @@
 
   <!-- Volume -->
   <div class="volume-row">
-    <button class="mute-btn icon-btn" id="muteBtn" title="Mute" onclick="toggleMute()" style="flex-shrink:0">
+    <button class="mute-btn icon-btn" id="muteBtn" title="Mute" style="flex-shrink:0">
       <svg id="iconMuteOff" viewBox="0 0 24 24"><path d="M18.5 12A4.5 4.5 0 0 0 16 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5zm7-.17v6.34L9.83 13H7v-2h2.83L12 8.83z"/></svg>
       <svg id="iconMuteOn"  viewBox="0 0 24 24" style="display:none"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06A8.99 8.99 0 0 0 17.73 18l2 2L21 18.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
     </button>
-    <input type="range" id="volumeSlider" min="0" max="100" value="10"
-      oninput="onVolumeInput(this.value)" onchange="setVolume(this.value)" />
+    <input type="range" id="volumeSlider" min="0" max="100" value="10" />
   </div>
 
   <!-- Source Tabs -->
   <div class="source-tabs">
-
-    <!-- Wi-Fi popover — positioned relative to .source-tabs -->
     <div class="wifi-popover" id="wifiPopover">
-      <div class="wifi-popover-item spotify" onclick="switchSpotify()">
+      <div class="wifi-popover-item spotify">
         <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.65 14.4c-.2.32-.62.42-.94.22-2.57-1.57-5.8-1.93-9.61-1.06-.37.08-.73-.14-.82-.51-.08-.37.14-.73.51-.82 4.17-.95 7.75-.54 10.63 1.22.32.2.42.62.23.95zm1.24-2.76c-.25.4-.78.52-1.18.28-2.94-1.81-7.43-2.33-10.91-1.28-.45.14-.93-.12-1.07-.57-.13-.45.12-.93.57-1.07 3.98-1.21 8.93-.62 12.31 1.46.4.24.52.78.28 1.18zm.11-2.87C14.25 8.88 8.8 8.7 5.44 9.7c-.54.16-1.11-.14-1.27-.68-.16-.54.14-1.11.68-1.27 3.88-1.18 10.33-.95 14.4 1.47.49.28.65.9.37 1.38-.28.49-.9.65-1.38.37z"/></svg>
         <span>Spotify</span>
       </div>
-      <div class="wifi-popover-item radio" onclick="openRadioDrawer()">
-        <svg viewBox="0 0 28 25" xmlns="http://www.w3.org/2000/svg"><rect x="18.5" y="0" width="3" height="8" rx="1.5"/><rect x="0" y="6" width="28" height="19" rx="4"/><circle cx="20" cy="15.5" r="6.5" fill="white" opacity="0.92"/><circle cx="5.5" cy="10.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="15.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="20.5" r="2" fill="white" opacity="0.92"/><circle cx="10"  cy="10.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10"  cy="15.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10"  cy="20.5" r="2.2" fill="white" opacity="0.92"/></svg>
+      <div class="wifi-popover-item radio">
+        <svg viewBox="0 0 28 25" xmlns="http://www.w3.org/2000/svg">
+          <rect x="18.5" y="0" width="3" height="8" rx="1.5"/>
+          <rect x="0" y="6" width="28" height="19" rx="4"/>
+          <circle cx="20" cy="15.5" r="6.5" fill="white" opacity="0.92"/>
+          <circle cx="5.5" cy="10.5" r="2" fill="white" opacity="0.92"/>
+          <circle cx="5.5" cy="15.5" r="2" fill="white" opacity="0.92"/>
+          <circle cx="5.5" cy="20.5" r="2" fill="white" opacity="0.92"/>
+          <circle cx="10"  cy="10.5" r="2.2" fill="white" opacity="0.92"/>
+          <circle cx="10"  cy="15.5" r="2.2" fill="white" opacity="0.92"/>
+          <circle cx="10"  cy="20.5" r="2.2" fill="white" opacity="0.92"/>
+        </svg>
         <span>Radio</span>
       </div>
     </div>
-
-    <button class="src-tab bluetooth" id="tabBluetooth" onclick="handleBluetoothTab()">
+    <button class="src-tab bluetooth" id="tabBluetooth">
       <svg viewBox="0 0 24 24"><path d="M17.71 7.71 12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
     </button>
-
-    <button class="src-tab aux" id="tabAux" onclick="switchSource('AUX','AUX')">AUX</button>
-
-    <button class="src-tab wifi" id="tabWifi" onclick="toggleWifiPopover()">
+    <button class="src-tab aux" id="tabAux">AUX</button>
+    <button class="src-tab wifi" id="tabWifi">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none"/>
         <path d="M8.5 16.5a5 5 0 0 1 7 0"/>
@@ -978,1249 +169,54 @@
         <path d="M1 8.5a17 17 0 0 1 22 0"/>
       </svg>
     </button>
-
   </div>
 
-</div>
+</div><!-- .app -->
 
-<!-- Hamburger Drawer -->
-<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer(event)">
+<!-- Left drawer -->
+<div class="drawer-overlay" id="drawerOverlay">
   <div class="drawer" id="drawer">
     <div class="drawer-header">
-      <span class="drawer-title">Menu</span>
-      <button class="drawer-close" onclick="closeDrawer()">
+      <span class="drawer-title">Radio</span>
+      <button class="drawer-close">
         <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </button>
     </div>
     <div class="drawer-body">
-
-      <!-- Stations -->
       <div class="drawer-section" id="presetsSection">
         <span class="drawer-section-label">Presets</span>
-        <div class="preset-grid" id="presetGrid">
-          <!-- populated by loadPresets() -->
-        </div>
+        <div class="preset-grid" id="presetGrid"></div>
       </div>
-
       <div class="drawer-section" id="stationsSection">
         <span class="drawer-section-label">Radio Stations</span>
-
-        <!-- Country filter -->
         <div class="country-grid" id="countryGrid">
           <div style="color:rgba(255,255,255,0.3);font-size:0.8rem;padding:4px 0">Detecting location…</div>
         </div>
-
-        <!-- Search bar -->
         <div class="rb-search-row">
           <input class="rb-search-input" id="rbSearchInput" type="search"
-            placeholder="Search stations…" maxlength="80"
-            onkeydown="if(event.key==='Enter') rbSearch()" />
-          <button class="rb-search-btn" id="rbSearchBtn" onclick="rbSearch()">Search</button>
+            placeholder="Search stations…" maxlength="80" />
+          <button class="rb-search-btn" id="rbSearchBtn">Search</button>
         </div>
         <div class="rb-results" id="rbResults"></div>
         <hr class="rb-divider" id="rbDivider" style="display:none" />
-
-        <!-- Saved Stations -->
         <ul class="sheet-list" id="stationList"><li><span class="item-name">Loading…</span></li></ul>
         <div class="add-station-form">
           <span class="form-label">Add Station</span>
           <input class="form-input" id="stationNameInput" type="text" placeholder="Station name" maxlength="60" />
           <input class="form-input" id="stationUrlInput"  type="url"  placeholder="Stream URL (http://…)" />
-          <button class="btn-add-station" onclick="addStation()">+ Add Station</button>
+          <button class="btn-add-station">+ Add Station</button>
         </div>
       </div>
-
-
     </div>
   </div>
 </div>
 
-<script>
-// ── State ────────────────────────────────────────────────────────────────────
-let isPlaying      = false;
-let currentSource  = null;
-let speakerCaps    = { hasToneControls: false, hasDspControls: false, bass: { available: false } };
-let currentDspMode = null;
-let allSources     = [];
-
-// ── Album art & dynamic background ───────────────────────────────────────────
-let lastArtUrl = null;
-
-function extractDominantColor(imgEl) {
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 24;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(imgEl, 0, 0, 24, 24);
-    const data = ctx.getImageData(0, 0, 24, 24).data;
-    let r = 0, g = 0, b = 0, count = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      const br = (data[i] + data[i+1] + data[i+2]) / 3;
-      if (br > 25 && br < 225) { r += data[i]; g += data[i+1]; b += data[i+2]; count++; }
-    }
-    if (!count) return null;
-    return [Math.round(r/count), Math.round(g/count), Math.round(b/count)];
-  } catch { return null; }
-}
-
-function applyBackground(rgb) {
-  const overlay = document.getElementById('bgOverlay');
-  if (!rgb) { overlay.style.opacity = '0'; return; }
-  const [r, g, b] = rgb;
-  const d = (x) => Math.round(x * 0.35);
-  overlay.style.background =
-    `linear-gradient(180deg, rgb(${r},${g},${b}) 0%, rgb(${d(r)},${d(g)},${d(b)}) 45%, #111 100%)`;
-  overlay.style.opacity = '1';
-}
-
-function showArtLayout(proxyUrl, s) {
-  const img = document.getElementById('artImg');
-  const app = document.querySelector('.app');
-
-  img.onload = () => {
-    const rgb = extractDominantColor(img);
-    applyBackground(rgb);
-    app.classList.add('art-mode');
-  };
-  img.onerror = () => {
-    // Image failed — fall back to card layout
-    applyBackground(null);
-    app.classList.remove('art-mode');
-  };
-  img.src = proxyUrl;
-}
-
-function showCardLayout() {
-  document.querySelector('.app').classList.remove('art-mode');
-  applyBackground(null);
-}
-
-function updateArtInfo(s) {
-  const isRadio = s.source === 'wifi' && s.wifiType === 'radio';
-  document.getElementById('artTrack').textContent  = isRadio
-    ? (s.stationName || s.track || 'Internet Radio')
-    : (s.track || '');
-  document.getElementById('artArtist').textContent = isRadio
-    ? (s.track ? (s.artist || '') : '')
-    : (s.artist || '');
-  document.getElementById('artAlbum').textContent  = isRadio ? '' : (s.album || '');
-}
-
-// ── Playback timer ────────────────────────────────────────────────────────────
-
-
-// ── WebSocket ────────────────────────────────────────────────────────────────
-function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}`);
-  ws.onmessage = e => {
-    try {
-      const msg = JSON.parse(e.data);
-      if      (msg.type === 'status')  applyStatus(msg);
-      else if (msg.type === 'progress') applyProgress(msg);
-      else if (msg.type === 'sources') { allSources = msg.sources; }
-      else if (msg.type === 'info')    { document.getElementById('speakerName').textContent = msg.name.toUpperCase(); }
-    } catch {}
-  };
-  ws.onopen  = () => document.getElementById('offlineBanner').classList.remove('show');
-  ws.onclose = () => {
-    document.getElementById('offlineBanner').classList.add('show');
-    setTimeout(connectWS, 3000);
-  };
-  ws.onerror = () => ws.close();
-}
-connectWS();
-
-// ── Status ───────────────────────────────────────────────────────────────────
-function applyStatus(s) {
-  if (s.error) {
-    document.getElementById('statusLine').textContent = s.error;
-    document.getElementById('npTrack').innerHTML = '<span class="np-idle">—</span>';
-    document.getElementById('npArtist').textContent = '';
-    document.getElementById('npAlbum').textContent  = '';
-    lastArtUrl = null;
-    showCardLayout();
-    return;
-  }
-  // Clear offline banner whenever we get a valid status update
-  document.getElementById('offlineBanner').classList.remove('show');
-
-  fetchSpeakerName();
-
-  const statusMap = { PLAY_STATE: 'Playing', PAUSE_STATE: 'Paused', STOP_STATE: 'Stopped', BUFFERING_STATE: 'Buffering…' };
-  document.getElementById('statusLine').textContent = statusMap[s.status] || s.status || '';
-
-  isPlaying = s.status === 'PLAY_STATE';
-  document.getElementById('iconPlay').style.display  = isPlaying ? 'none' : '';
-  document.getElementById('iconPause').style.display = isPlaying ? '' : 'none';
-  isPlaying ? resumeMarquees() : pauseMarquees();
-
-  const trackEl  = document.getElementById('npTrack');
-  const artistEl = document.getElementById('npArtist');
-  const albumEl  = document.getElementById('npAlbum');
-
-  if (s.source === 'wifi' && s.wifiType === 'radio') {
-    trackEl.textContent  = s.stationName || s.track || 'Internet Radio';
-    artistEl.textContent = s.track ? (s.artist || '') : '';
-    albumEl.textContent  = '';
-  } else if (s.track || s.artist) {
-    trackEl.textContent  = s.track  || '';
-    artistEl.textContent = s.artist || '';
-    albumEl.textContent  = s.album  || '';
-  } else if (s.source === 'bluetooth' && s.bluetoothDevice) {
-    trackEl.textContent  = s.bluetoothDevice;
-    artistEl.textContent = 'Connected via Bluetooth';
-    albumEl.textContent  = '';
-  } else {
-    trackEl.innerHTML    = '<span class="np-idle">—</span>';
-    artistEl.textContent = '';
-    albumEl.textContent  = '';
-  }
-
-  const playing = s.status === 'PLAY_STATE';
-  updateMarquee(document.getElementById('npTrack'),  playing);
-  updateMarquee(document.getElementById('artTrack'), playing);
-
-
-  // Album art — switch layouts if art availability changed
-  const artUrl = s.artUrl || null;
-  if (artUrl !== lastArtUrl) {
-    lastArtUrl = artUrl;
-    if (artUrl) {
-      showArtLayout('/art-proxy?url=' + encodeURIComponent(artUrl), s);
-    } else {
-      showCardLayout();
-    }
-  }
-  // Always keep art-info text current (track may change with same art)
-  if (artUrl) updateArtInfo(s);
-
-  const btDevice = (s.bluetoothDevice || '').trim();
-  const btLabel = btDevice ? 'Bluetooth · ' + btDevice : 'Bluetooth';
-  const srcLabels = {
-    bluetooth: btLabel, aux: 'AUX In',
-    wifi: s.wifiType === 'spotify' ? 'Spotify Connect' : s.wifiType === 'airplay' ? 'AirPlay' : s.wifiType === 'radio' ? 'Internet Radio' : 'Wi-Fi',
-    unknown: 'Standby'
-  };
-  document.getElementById('sourceLabel').textContent = srcLabels[s.source] ?? 'Source';
-  currentSource = s.source;
-
-  // Power button illuminates when speaker is active (not standby)
-  document.getElementById('btnPower').classList.toggle('on', s.source !== 'unknown');
-
-  // Hide progress bar and queue icon if no longer on Spotify
-  const isSpotify = s.source === 'wifi' && s.wifiType === 'spotify';
-  if (!isSpotify) { hideProgress(); dismissUpNext(); }
-  setQueueIconVisible(isSpotify);
-  setHeartVisible(isSpotify);
-
-  document.getElementById('tabBluetooth').classList.toggle('active', s.source === 'bluetooth');
-  document.getElementById('tabAux').classList.toggle('active',       s.source === 'aux');
-  document.getElementById('tabWifi').classList.toggle('active',      s.source === 'wifi');
-
-  if (document.activeElement !== document.getElementById('volumeSlider'))
-    setSliderValue(Number(s.volume));
-
-  // Sync mute icon to actual speaker state
-  if (typeof s.muted === 'boolean') {
-    isMuted = s.muted;
-    document.getElementById('iconMuteOff').style.display = isMuted ? 'none' : '';
-    document.getElementById('iconMuteOn').style.display  = isMuted ? '' : 'none';
-  }
-
-  // Refresh source list badges if panel open
-}
-
-// ── Speaker Name ─────────────────────────────────────────────────────────────
-let nameFetched = false;
-async function fetchSpeakerName() {
-  if (nameFetched) return;
-  try {
-    const d = await fetch('/discovery').then(r => r.json());
-    if (d.name) { document.getElementById('speakerName').textContent = d.name.toUpperCase(); nameFetched = true; }
-  } catch {}
-}
-fetchSpeakerName();
-
-function startRename() {
-  const nameEl = document.getElementById('speakerName');
-  const wrap   = document.getElementById('nameEditWrap');
-  const input  = document.getElementById('nameInput');
-  input.value  = nameEl.textContent;
-  nameEl.style.display = 'none';
-  wrap.classList.add('active');
-  input.focus();
-  input.select();
-}
-
-function cancelRename() {
-  document.getElementById('speakerName').style.display = '';
-  document.getElementById('nameEditWrap').classList.remove('active');
-}
-
-async function commitRename() {
-  const input = document.getElementById('nameInput');
-  const name  = input.value.trim();
-  if (!name) { cancelRename(); return; }
-  try {
-    const res = await fetch('/name', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    });
-    if (res.ok) {
-      document.getElementById('speakerName').textContent = name.toUpperCase();
-    }
-  } catch {}
-  cancelRename();
-}
-
-function onNameKey(e) {
-  if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
-  if (e.key === 'Escape') cancelRename();
-}
-
-// ── Capabilities ─────────────────────────────────────────────────────────────
-
-
-
-// ── API helpers ───────────────────────────────────────────────────────────────
-async function api(endpoint) {
-  try { await fetch(`/${endpoint}`); } catch {}
-}
-
-function togglePlay() { api(isPlaying ? 'pause' : 'play'); }
-
-function handleBluetoothTab() { switchSource('BLUETOOTH', ''); }
-
-async function switchSource(source, sourceAccount) {
-  try {
-    await fetch('/source', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source, sourceAccount })
-    });
-  } catch {}
-}
-
-// ── Volume ────────────────────────────────────────────────────────────────────
-function setSliderValue(val) {
-  const sl = document.getElementById('volumeSlider');
-  sl.value = val;
-  sl.style.setProperty('--pct', `${val}%`);
-}
-function onVolumeInput(val) {
-  document.getElementById('volumeSlider').style.setProperty('--pct', `${val}%`);
-}
-function setVolume(val) { api(`volume/${val}`); }
-
-// ── EQ ────────────────────────────────────────────────────────────────────────
-
-
-
-
-
-
-const DSP_LABELS = {
-  AUDIO_MODE_NORMAL: 'Normal', AUDIO_MODE_DIALOG: 'Dialog',
-  AUDIO_MODE_NIGHT: 'Night',   AUDIO_MODE_DIRECT: 'Direct'
-};
-
-
-
-// ── Sources panel ─────────────────────────────────────────────────────────────
-
-
-
-
-
-// ── Stations panel ────────────────────────────────────────────────────────────
-let stationsData = [];
-
-async function loadStations() {
-  try {
-    stationsData = await fetch('/stations').then(r => r.json());
-    renderStations();
-  } catch {
-    document.getElementById('stationList').innerHTML = '<li><span class="item-name">Could not load stations</span></li>';
-  }
-}
-
-function renderStations() {
-  const list = document.getElementById('stationList');
-  if (!stationsData.length) {
-    list.innerHTML = '<li><span class="item-name" style="color:rgba(255,255,255,0.3)">No stations yet — add one below</span></li>';
-    return;
-  }
-  list.innerHTML = stationsData.map((s, i) => {
-    const logoHtml = s.favicon
-      ? `<img class="station-favicon" src="${s.favicon}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><svg class="station-favicon-fallback" style="display:none" viewBox="0 0 28 25" xmlns="http://www.w3.org/2000/svg"><rect x="18.5" y="0" width="3" height="8" rx="1.5"/><rect x="0" y="6" width="28" height="19" rx="4"/><circle cx="20" cy="15.5" r="6.5" fill="white" opacity="0.92"/><circle cx="5.5" cy="10.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="15.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="20.5" r="2" fill="white" opacity="0.92"/><circle cx="10"  cy="10.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10"  cy="15.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10"  cy="20.5" r="2.2" fill="white" opacity="0.92"/></svg>`
-      : `<svg class="station-favicon-fallback" viewBox="0 0 28 25"><rect x="18.5" y="0" width="3" height="8" rx="1.5"/><rect x="0" y="6" width="28" height="19" rx="4"/><circle cx="20" cy="15.5" r="6.5" fill="white" opacity="0.92"/><circle cx="5.5" cy="10.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="15.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="20.5" r="2" fill="white" opacity="0.92"/><circle cx="10" cy="10.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10" cy="15.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10" cy="20.5" r="2.2" fill="white" opacity="0.92"/></svg>`;
-    return `<li class="station-item" data-index="${i}" style="-webkit-tap-highlight-color:transparent">
-      <div class="station-logo-wrap">${logoHtml}</div>
-      <span class="item-name" onclick="playStation(${i})" style="flex:1;cursor:pointer">${s.name}</span>
-      <div style="display:flex;align-items:center;gap:4px">
-        <div class="item-icon" onclick="playStation(${i})" style="cursor:pointer">
-          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-        </div>
-        <button class="delete-btn" onclick="event.stopPropagation();showPresetPicker('${s.name}','${s.url}',null)" title="Save to preset" style="margin-right:2px">
-          <svg viewBox="0 0 24 24"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm0 16H5V5h11.17L19 7.83V19zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zM6 6h9v4H6z"/></svg>
-        </button>
-        <button class="delete-btn" onclick="event.stopPropagation();deleteStation(${i})" title="Remove">
-          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-        </button>
-        <div class="drag-handle" onmousedown="dragStart(event,${i})" ontouchstart="dragStart(event,${i})" title="Drag to reorder">
-          <svg viewBox="0 0 24 24"><path d="M9 3h2v2H9zm4 0h2v2h-2zM9 7h2v2H9zm4 0h2v2h-2zM9 11h2v2H9zm4 0h2v2h-2zM9 15h2v2H9zm4 0h2v2h-2zM9 19h2v2H9zm4 0h2v2h-2z"/></svg>
-        </div>
-      </div>
-    </li>`;
-  }).join('');
-}
-
-async function playStation(id) {
-  closeDrawer();
-  await api(`radio/${id}`);
-}
-
-async function saveStationsOrder() {
-  try {
-    await fetch('/stations', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(stationsData)
-    });
-  } catch {}
-}
-
-async function addStation() {
-  const name = document.getElementById('stationNameInput').value.trim();
-  const url  = document.getElementById('stationUrlInput').value.trim();
-  if (!name || !url) { alert('Please enter both a name and a stream URL.'); return; }
-  try {
-    const res = await fetch('/stations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, url })
-    });
-    if (!res.ok) { alert(await res.text()); return; }
-    document.getElementById('stationNameInput').value = '';
-    document.getElementById('stationUrlInput').value  = '';
-    await loadStations(); // refresh list
-  } catch { alert('Could not save station.'); }
-}
-
-async function deleteStation(id) {
-  if (!confirm('Remove this station?')) return;
-  try {
-    await fetch(`/stations/${id}`, { method: 'DELETE' });
-    await loadStations();
-  } catch { alert('Could not delete station.'); }
-}
-
-
-
-// ── Presets ───────────────────────────────────────────────────────────────────
-let presetsData = Array(6).fill(null);
-
-async function loadPresets() {
-  try {
-    const xml  = await fetch('/presets').then(r => r.text());
-    const parser = new DOMParser();
-    const doc  = parser.parseFromString(xml, 'text/xml');
-    presetsData = Array(6).fill(null);
-    doc.querySelectorAll('preset').forEach(p => {
-      const id   = parseInt(p.getAttribute('id'), 10) - 1;
-      const item = p.querySelector('ContentItem');
-      if (id >= 0 && id < 6 && item) {
-        presetsData[id] = {
-          name:   item.querySelector('itemName')?.textContent || item.getAttribute('itemName') || 'Preset ' + (id + 1),
-          source: item.getAttribute('source') || '',
-        };
-      }
-    });
-    renderPresets();
-  } catch { renderPresets(); }
-}
-
-function renderPresets() {
-  const grid = document.getElementById('presetGrid');
-  if (!grid) return;
-  grid.innerHTML = presetsData.map((p, i) => {
-    if (p) {
-      return `<button class="preset-tile filled" onclick="playPreset(${i+1})" title="${p.name}">
-        <span class="preset-tile-name">${p.name}</span>
-        <span class="preset-tile-num">${i+1}</span>
-      </button>`;
-    }
-    return `<button class="preset-tile" onclick="saveToPreset(${i+1})" title="Save to preset ${i+1}">
-      <span class="preset-tile-plus">+</span>
-      <span class="preset-tile-num">${i+1}</span>
-    </button>`;
-  }).join('');
-}
-
-async function playPreset(num) {
-  await api('preset/' + num);
-  closeDrawer();
-}
-
-async function saveToPreset(num) {
-  // No-op for empty tiles tapped without context — 
-  // saving happens from station list via saveStationToPreset()
-  showPresetPicker(null, null, num);
-}
-
-// Called from station row — opens a mini slot picker
-function showPresetPicker(stationName, stationUrl, preSelectSlot) {
-  // Build a simple confirm-style overlay
-  const existing = document.getElementById('presetPickerOverlay');
-  if (existing) existing.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'presetPickerOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center';
-
-  const box = document.createElement('div');
-  box.style.cssText = 'background:#222;border-radius:16px;padding:22px 18px;width:80%;max-width:300px';
-
-  const title = document.createElement('div');
-  title.style.cssText = "font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.95rem;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:14px";
-  title.textContent = stationName ? 'Save to Preset' : 'Choose Preset Slot';
-  box.appendChild(title);
-
-  const grid = document.createElement('div');
-  grid.style.cssText = 'display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:18px';
-
-  presetsData.forEach((p, i) => {
-    const btn = document.createElement('button');
-    btn.style.cssText = 'aspect-ratio:1/1;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;-webkit-tap-highlight-color:transparent';
-    btn.innerHTML = p
-      ? `<span style="font-size:0.55rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;color:rgba(255,255,255,0.7);text-align:center;line-height:1.1;word-break:break-word">${p.name}</span>`
-      : `<span style="font-size:1.1rem;color:rgba(255,255,255,0.25)">+</span>`;
-    btn.innerHTML += `<span style="font-size:0.55rem;font-family:'Barlow Condensed',sans-serif;color:rgba(255,255,255,0.3)">${i+1}</span>`;
-    if (preSelectSlot === i + 1) btn.style.borderColor = '#0066ff';
-    btn.onclick = () => {
-      overlay.remove();
-      if (stationName && stationUrl) commitSaveToPreset(i + 1, stationName, stationUrl);
-    };
-    grid.appendChild(btn);
-  });
-  box.appendChild(grid);
-
-  const cancel = document.createElement('button');
-  cancel.textContent = 'Cancel';
-  cancel.style.cssText = 'width:100%;padding:11px 0;border-radius:10px;border:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);font-family:"Barlow Condensed",sans-serif;font-size:0.85rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer';
-  cancel.onclick = () => overlay.remove();
-  box.appendChild(cancel);
-
-  overlay.appendChild(box);
-  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-  document.body.appendChild(overlay);
-}
-
-async function commitSaveToPreset(num, name, url) {
-  try {
-    await fetch('/preset/store', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ num, name, url })
-    });
-    await loadPresets();
-  } catch {}
-}
-
-// ── Drag-to-reorder stations ──────────────────────────────────────────────────
-let dragSrcIdx   = null;
-let dragGhost    = null;
-let dragOffsetY  = 0;
-let dragOffsetX  = 0;
-
-function dragStart(e, idx) {
-  dragSrcIdx = idx;
-  const li   = document.querySelector(`.station-item[data-index="${idx}"]`);
-  if (!li) return;
-
-  const rect = li.getBoundingClientRect();
-  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-  dragOffsetX = clientX - rect.left;
-  dragOffsetY = clientY - rect.top;
-
-  // Create ghost
-  dragGhost = document.createElement('div');
-  dragGhost.className = 'drag-ghost';
-  dragGhost.textContent = stationsData[idx]?.name || '';
-  dragGhost.style.left  = (rect.left) + 'px';
-  dragGhost.style.top   = (rect.top)  + 'px';
-  dragGhost.style.width = rect.width  + 'px';
-  document.body.appendChild(dragGhost);
-
-  li.classList.add('dragging');
-
-  if (e.touches) {
-    document.addEventListener('touchmove',  dragMove,  { passive: false });
-    document.addEventListener('touchend',   dragEnd,   { once: true });
-  } else {
-    document.addEventListener('mousemove',  dragMove);
-    document.addEventListener('mouseup',    dragEnd,   { once: true });
-  }
-  e.preventDefault();
-}
-
-function dragMove(e) {
-  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-  if (dragGhost) {
-    dragGhost.style.left = (clientX - dragOffsetX) + 'px';
-    dragGhost.style.top  = (clientY - dragOffsetY) + 'px';
-  }
-
-  // Highlight drop target
-  document.querySelectorAll('.station-item').forEach(li => li.classList.remove('drag-over'));
-  const el = document.elementFromPoint(clientX, clientY)?.closest('.station-item');
-  if (el && el.dataset.index != dragSrcIdx) el.classList.add('drag-over');
-
-  e.preventDefault();
-}
-
-function dragEnd(e) {
-  document.removeEventListener('touchmove', dragMove);
-  document.removeEventListener('mousemove', dragMove);
-
-  // Find drop target
-  const clientX = e.touches ? e.changedTouches[0].clientX : e.clientX;
-  const clientY = e.touches ? e.changedTouches[0].clientY : e.clientY;
-  const target  = document.elementFromPoint(clientX, clientY)?.closest('.station-item');
-  const destIdx = target ? parseInt(target.dataset.index) : null;
-
-  // Clean up
-  if (dragGhost) { dragGhost.remove(); dragGhost = null; }
-  document.querySelectorAll('.station-item').forEach(li => {
-    li.classList.remove('dragging', 'drag-over');
-  });
-
-  // Reorder and save
-  if (destIdx !== null && destIdx !== dragSrcIdx) {
-    const item = stationsData.splice(dragSrcIdx, 1)[0];
-    stationsData.splice(destIdx, 0, item);
-    renderStations();
-    saveStationsOrder();
-  }
-
-  dragSrcIdx = null;
-}
-
-// ── Drawer open/close ────────────────────────────────────────────────────────
-function openDrawer() {
-  document.getElementById('drawerOverlay').classList.add('open');
-  loadPresets();
-  loadStations();
-  if (!document.getElementById('countryGrid').querySelector('.country-pill')) {
-    initCountryGrid();
-  }
-}
-
-function closeDrawer(e) {
-  if (e && e.target !== document.getElementById('drawerOverlay')) return;
-  document.getElementById('drawerOverlay').classList.remove('open');
-}
-
-// ── Mute toggle ───────────────────────────────────────────────────────────────
-let isMuted = false;
-function toggleMute() {
-  isMuted = !isMuted;
-  document.getElementById('iconMuteOff').style.display = isMuted ? 'none' : '';
-  document.getElementById('iconMuteOn').style.display  = isMuted ? '' : 'none';
-  api('mute');
-}
-
-
-// ── Spotify Progress Bar ──────────────────────────────────────────────────────
-let spDurationMs  = 0;
-let spProgressMs  = 0;
-let spIsPlaying   = false;
-let spTickInterval = null;
-
-function fmtMs(ms) {
-  const s = Math.floor(ms / 1000);
-  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-}
-
-function applyProgress(msg) {
-  if (msg.clear) {
-    hideProgress();
-    return;
-  }
-  spProgressMs  = msg.progress_ms  || 0;
-  spDurationMs  = msg.duration_ms  || 0;
-  spIsPlaying   = msg.is_playing   || false;
-
-  if (msg.shuffle_state !== undefined) applyShuffleRepeat(msg.shuffle_state, msg.repeat_state || 'off');
-  checkUpNext(msg.progress_ms, msg.duration_ms, msg.next_track);
-
-  // Fetch liked status when track changes
-  if (msg.track_id && msg.track_id !== currentTrackId) {
-    currentTrackId = msg.track_id;
-    fetchLikedStatus(currentTrackId);
-  }
-
-  document.getElementById('spProgressWrap').classList.add('visible');
-  document.getElementById('sourceRow').style.display = 'none';
-  renderProgress();
-
-  // Tick locally each second while playing so bar moves smoothly
-  clearInterval(spTickInterval);
-  if (spIsPlaying) {
-    spTickInterval = setInterval(() => {
-      spProgressMs = Math.min(spProgressMs + 1000, spDurationMs);
-      renderProgress();
-    }, 1000);
-  }
-}
-
-function renderProgress() {
-  const pct = spDurationMs > 0 ? (spProgressMs / spDurationMs) * 100 : 0;
-  document.getElementById('spBarFill').style.width  = pct.toFixed(2) + '%';
-  document.getElementById('spElapsed').textContent  = fmtMs(spProgressMs);
-  document.getElementById('spDuration').textContent = fmtMs(spDurationMs);
-}
-
-function hideProgress() {
-  clearInterval(spTickInterval);
-  spTickInterval = null;
-  spProgressMs = spDurationMs = 0;
-  document.getElementById('spProgressWrap').classList.remove('visible');
-  document.getElementById('sourceRow').style.display = '';
-}
-
-async function spSeek(e) {
-  if (!spDurationMs) return;
-  const bar  = document.getElementById('spBarRow');
-  const rect = bar.getBoundingClientRect();
-  const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-  const position_ms = Math.round(pct * spDurationMs);
-  // Update UI immediately
-  document.getElementById('spBarFill').style.transition = 'none';
-  spProgressMs = position_ms;
-  renderProgress();
-  setTimeout(() => {
-    document.getElementById('spBarFill').style.transition = 'width 1s linear';
-  }, 50);
-  // Tell server
-  try {
-    await fetch('/spotify/seek', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ position_ms })
-    });
-  } catch {}
-}
-
-
-// ── Shuffle / Repeat ──────────────────────────────────────────────────────────
-let shuffleOn  = false;
-let repeatMode = 'off'; // 'off' | 'track' | 'context'
-
-function applyShuffleRepeat(shuffle, repeat) {
-  shuffleOn  = shuffle;
-  repeatMode = repeat;
-
-  const btnS = document.getElementById('btnShuffle');
-  const btnR = document.getElementById('btnRepeat');
-  if (!btnS || !btnR) return;
-
-  btnS.classList.toggle('active', shuffleOn);
-
-  const isRepeat = repeatMode !== 'off';
-  btnR.classList.toggle('active', isRepeat);
-  document.getElementById('iconRepeatAll').style.display = repeatMode === 'track' ? 'none' : '';
-  document.getElementById('iconRepeatOne').style.display = repeatMode === 'track' ? '' : 'none';
-}
-
-function toggleShuffle() {
-  const next = !shuffleOn;
-  api('shuffle/' + (next ? 'on' : 'off'));
-  // Optimistic UI update
-  applyShuffleRepeat(next, repeatMode);
-}
-
-function cycleRepeat() {
-  const states = ['off', 'context', 'track'];
-  const next   = states[(states.indexOf(repeatMode) + 1) % states.length];
-  // Map to speaker key
-  const keyMap = { off: 'off', context: 'all', track: 'one' };
-  api('repeat/' + keyMap[next]);
-  // Optimistic UI update
-  applyShuffleRepeat(shuffleOn, next);
-}
-
-
-// ── Marquee scroll ────────────────────────────────────────────────────────────
-function updateMarquee(el, isPlaying) {
-  if (!el) return;
-  const wrap = el.parentElement;
-  if (!wrap || !wrap.classList.contains('marquee-wrap')) return;
-
-  // Reset first so we can measure
-  el.classList.remove('scrolling', 'paused');
-  el.style.removeProperty('--marquee-dist');
-  el.style.removeProperty('--marquee-dur');
-
-  // Measure overflow after reset
-  requestAnimationFrame(() => {
-    const overflow = el.scrollWidth - wrap.clientWidth;
-    if (overflow > 4) {
-      // Duration scales with distance — ~60px/s, min 4s, max 16s
-      const dur = Math.min(16, Math.max(4, overflow / 60));
-      el.style.setProperty('--marquee-dist', `-${overflow}px`);
-      el.style.setProperty('--marquee-dur', `${dur}s`);
-      el.classList.add('scrolling');
-      if (!isPlaying) el.classList.add('paused');
-    }
-  });
-}
-
-function pauseMarquees() {
-  document.querySelectorAll('.marquee-inner.scrolling').forEach(el => el.classList.add('paused'));
-}
-function resumeMarquees() {
-  document.querySelectorAll('.marquee-inner.scrolling').forEach(el => el.classList.remove('paused'));
-}
-
-
-
-// ── Liked Songs ───────────────────────────────────────────────────────────────
-let currentTrackId = null;
-let isLiked        = false;
-
-async function fetchLikedStatus(trackId) {
-  if (!trackId) return;
-  try {
-    const r = await fetch(`/spotify/liked?id=${trackId}`).then(r => r.json());
-    isLiked = r.liked;
-    document.getElementById('btnHeart')?.classList.toggle('liked', isLiked);
-  } catch {}
-}
-
-async function toggleLike() {
-  if (!currentTrackId) return;
-  // Optimistic update
-  isLiked = !isLiked;
-  document.getElementById('btnHeart')?.classList.toggle('liked', isLiked);
-  try {
-    await fetch('/spotify/like', {
-      method: isLiked ? 'POST' : 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: currentTrackId })
-    });
-  } catch {
-    // Revert on failure
-    isLiked = !isLiked;
-    document.getElementById('btnHeart')?.classList.toggle('liked', isLiked);
-  }
-}
-
-function setHeartVisible(visible) {
-  document.getElementById('btnHeart')?.classList.toggle('visible', visible);
-  if (!visible) {
-    currentTrackId = null;
-    isLiked = false;
-    document.getElementById('btnHeart')?.classList.remove('liked');
-  }
-}
-
-// ── Queue drawer ──────────────────────────────────────────────────────────────
-let queueData        = [];
-let queueConfirmSkips = 0;
-let upnextTimer      = null;
-let upnextShown      = false;
-let lastNextTrack    = null;
-
-async function openQueueDrawer() {
-  document.getElementById('queueOverlay').classList.add('open');
-  const list = document.getElementById('queueList');
-  list.innerHTML = '<div style="padding:24px 20px;color:rgba(255,255,255,0.3);font-family:Barlow,sans-serif;font-size:0.85rem">Loading…</div>';
-  try {
-    queueData = await fetch('/spotify/queue').then(r => r.json());
-    if (!queueData.length) {
-      list.innerHTML = '<div style="padding:24px 20px;color:rgba(255,255,255,0.3);font-family:Barlow,sans-serif;font-size:0.85rem">Queue is empty</div>';
-      return;
-    }
-    list.innerHTML = queueData.map((t, i) => `
-      <div class="queue-item" onclick="confirmSkip(${i + 1}, '${t.name.replace(/'/g, "\'")}')">
-        <span class="queue-item-num">${i + 1}</span>
-        <img class="queue-item-art" src="${t.artUrl || ''}" alt="" onerror="this.style.opacity=0" />
-        <div class="queue-item-info">
-          <div class="queue-item-name">${t.name}</div>
-          <div class="queue-item-artist">${t.artist}</div>
-        </div>
-      </div>`).join('');
-  } catch {
-    list.innerHTML = '<div style="padding:24px 20px;color:rgba(255,255,255,0.3);font-family:Barlow,sans-serif;font-size:0.85rem">Could not load queue</div>';
-  }
-}
-
-function closeQueueDrawer(e) {
-  if (e && e.target !== document.getElementById('queueOverlay')) return;
-  document.getElementById('queueOverlay').classList.remove('open');
-}
-
-function confirmSkip(numSkips, trackName) {
-  queueConfirmSkips = numSkips;
-  const msg = numSkips === 1
-    ? `Skip to "${trackName}"?`
-    : `Skip ${numSkips} tracks to "${trackName}"?`;
-  document.getElementById('queueConfirmMsg').textContent = msg;
-  document.getElementById('queueConfirmOk').onclick = executeSkip;
-  document.getElementById('queueConfirm').classList.add('open');
-}
-
-function closeQueueConfirm() {
-  document.getElementById('queueConfirm').classList.remove('open');
-}
-
-async function executeSkip() {
-  closeQueueConfirm();
-  closeQueueDrawer();
-  // Fire next() queueConfirmSkips times with small delay between each
-  for (let i = 0; i < queueConfirmSkips; i++) {
-    await fetch('/next');
-    if (i < queueConfirmSkips - 1) await new Promise(r => setTimeout(r, 600));
-  }
-}
-
-// ── Up Next flyout ────────────────────────────────────────────────────────────
-function showUpNext(track) {
-  if (!track) return;
-  document.getElementById('upnextArt').src    = track.artUrl || '';
-  document.getElementById('upnextName').textContent   = track.name;
-  document.getElementById('upnextArtist').textContent = track.artist;
-  document.getElementById('upnextFlyout').classList.add('show');
-  clearTimeout(upnextTimer);
-  upnextTimer = setTimeout(dismissUpNext, 5000);
-}
-
-function dismissUpNext() {
-  document.getElementById('upnextFlyout').classList.remove('show');
-  clearTimeout(upnextTimer);
-}
-
-// Called from applyProgress — check if we're 20s from the end
-function checkUpNext(progressMs, durationMs, nextTrack) {
-  if (!durationMs) return;
-  const remaining = durationMs - progressMs;
-  const threshold = 20_000;
-
-  // Reset flag when a new track starts (remaining resets to full duration)
-  // Must happen regardless of whether next_track is available
-  if (remaining > threshold + 5000) {
-    upnextShown = false;
-  }
-
-  // Show flyout once per track when we cross the 20s mark
-  if (!nextTrack || !remaining || upnextShown) return;
-  if (remaining <= threshold && remaining > 0) {
-    const nextKey = nextTrack.name + nextTrack.artist;
-    if (nextKey !== lastNextTrack) {
-      lastNextTrack = nextKey;
-      upnextShown   = true;
-      showUpNext(nextTrack);
-    }
-  }
-}
-
-// Show/hide queue icon based on Spotify active state
-function setQueueIconVisible(visible) {
-  document.getElementById('btnQueue')?.classList.toggle('visible', visible);
-}
-
-// ── Wi-Fi source popover ──────────────────────────────────────────────────────
-function toggleWifiPopover() {
-  const pop = document.getElementById('wifiPopover');
-  pop.classList.toggle('open');
-}
-
-function closeWifiPopover() {
-  document.getElementById('wifiPopover')?.classList.remove('open');
-}
-
-function switchSpotify() {
-  closeWifiPopover();
-  // Find the READY Spotify source dynamically from the last broadcast sources
-  const spotify = (allSources || []).find(s => s.source === 'SPOTIFY' && s.status === 'READY');
-  if (spotify) {
-    switchSource('SPOTIFY', spotify.sourceAccount);
-  } else {
-    // Fallback — switch without account, speaker will use default
-    switchSource('SPOTIFY', '');
-  }
-}
-
-function openRadioDrawer() {
-  closeWifiPopover();
-  openDrawer();
-  // Scroll drawer to the stations section
-  setTimeout(() => {
-    const el = document.getElementById('stationsSection');
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 150);
-}
-
-// Close popover when clicking outside
-document.addEventListener('click', e => {
-  const pop  = document.getElementById('wifiPopover');
-  const btn  = document.getElementById('tabWifi');
-  if (pop && !pop.contains(e.target) && btn && !btn.contains(e.target)) closeWifiPopover();
-});
-
-
-// ── Radio Browser tabs & country browse ──────────────────────────────────────
-
-// Full ISO country list — name + 2-letter code
-const COUNTRIES = [
-  ['Afghanistan','AF'],['Albania','AL'],['Algeria','DZ'],['Angola','AO'],['Argentina','AR'],
-  ['Armenia','AM'],['Australia','AU'],['Austria','AT'],['Azerbaijan','AZ'],['Bahrain','BH'],
-  ['Bangladesh','BD'],['Belarus','BY'],['Belgium','BE'],['Benin','BJ'],['Bolivia','BO'],
-  ['Bosnia','BA'],['Botswana','BW'],['Brazil','BR'],['Bulgaria','BG'],['Burkina Faso','BF'],
-  ['Burundi','BI'],['Cambodia','KH'],['Cameroon','CM'],['Canada','CA'],['Chad','TD'],
-  ['Chile','CL'],['China','CN'],['Colombia','CO'],['Congo','CG'],['Costa Rica','CR'],
-  ['Croatia','HR'],['Cuba','CU'],['Cyprus','CY'],['Czech Republic','CZ'],['Denmark','DK'],
-  ['Dominican Republic','DO'],['DR Congo','CD'],['Ecuador','EC'],['Egypt','EG'],
-  ['El Salvador','SV'],['Estonia','EE'],['Ethiopia','ET'],['Finland','FI'],['France','FR'],
-  ['Gabon','GA'],['Gambia','GM'],['Georgia','GE'],['Germany','DE'],['Ghana','GH'],
-  ['Greece','GR'],['Guatemala','GT'],['Guinea','GN'],["Côte d'Ivoire",'CI'],['Haiti','HT'],
-  ['Honduras','HN'],['Hungary','HU'],['Iceland','IS'],['India','IN'],['Indonesia','ID'],
-  ['Iran','IR'],['Iraq','IQ'],['Ireland','IE'],['Israel','IL'],['Italy','IT'],
-  ['Jamaica','JM'],['Japan','JP'],['Jordan','JO'],['Kazakhstan','KZ'],['Kenya','KE'],
-  ['Kosovo','XK'],['Kuwait','KW'],['Latvia','LV'],['Lebanon','LB'],['Liberia','LR'],
-  ['Libya','LY'],['Lithuania','LT'],['Luxembourg','LU'],['Madagascar','MG'],['Malawi','MW'],
-  ['Malaysia','MY'],['Mali','ML'],['Malta','MT'],['Mauritania','MR'],['Mauritius','MU'],
-  ['Mexico','MX'],['Moldova','MD'],['Morocco','MA'],['Mozambique','MZ'],['Myanmar','MM'],
-  ['Namibia','NA'],['Nepal','NP'],['Netherlands','NL'],['New Zealand','NZ'],['Nicaragua','NI'],
-  ['Niger','NE'],['Nigeria','NG'],['North Macedonia','MK'],['Norway','NO'],['Oman','OM'],
-  ['Pakistan','PK'],['Palestine','PS'],['Panama','PA'],['Paraguay','PY'],['Peru','PE'],
-  ['Philippines','PH'],['Poland','PL'],['Portugal','PT'],['Qatar','QA'],['Romania','RO'],
-  ['Russia','RU'],['Rwanda','RW'],['Saudi Arabia','SA'],['Senegal','SN'],['Serbia','RS'],
-  ['Sierra Leone','SL'],['Singapore','SG'],['Slovakia','SK'],['Slovenia','SI'],
-  ['Somalia','SO'],['South Africa','ZA'],['South Korea','KR'],['South Sudan','SS'],
-  ['Spain','ES'],['Sri Lanka','LK'],['Sudan','SD'],['Sweden','SE'],['Switzerland','CH'],
-  ['Syria','SY'],['Taiwan','TW'],['Tanzania','TZ'],['Thailand','TH'],['Togo','TG'],
-  ['Trinidad','TT'],['Tunisia','TN'],['Turkey','TR'],['Uganda','UG'],['Ukraine','UA'],
-  ['United Arab Emirates','AE'],['United Kingdom','GB'],['United States','US'],
-  ['Uruguay','UY'],['Uzbekistan','UZ'],['Venezuela','VE'],['Vietnam','VN'],['Yemen','YE'],
-  ['Zambia','ZM'],['Zimbabwe','ZW'],
-];
-
-let detectedCountryCode = null;
-let selectedCountryCode = null;
-
-
-function initCountryGrid() {
-  // Try geolocation
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        try {
-          const { latitude: lat, longitude: lon } = pos.coords;
-          const r = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
-            { headers: { 'Accept-Language': 'en' } }
-          ).then(r => r.json());
-          const code = r.address?.country_code?.toUpperCase();
-          if (code) {
-            detectedCountryCode = code;
-          }
-        } catch {}
-        renderCountryGrid();
-      },
-      () => renderCountryGrid() // permission denied or error
-    );
-  } else {
-    renderCountryGrid();
-  }
-}
-
-function renderCountryGrid() {
-  const grid = document.getElementById('countryGrid');
-  const sorted = [...COUNTRIES].sort((a, b) => {
-    if (a[1] === detectedCountryCode) return -1;
-    if (b[1] === detectedCountryCode) return 1;
-    return a[0].localeCompare(b[0]);
-  });
-  grid.innerHTML = sorted.map(([name, code]) => {
-    const isDetected = code === detectedCountryCode;
-    const isSelected = code === selectedCountryCode;
-    return '<button class="country-pill' + (isDetected ? ' country-detected' : '') + (isSelected ? ' selected' : '') + '"'
-      + ' onclick="selectCountry(\'' + code + '\', \'' + name.replace(/'/g, "\'") + '\', this)">'
-      + name + (isDetected ? ' 📍' : '')
-      + '</button>';
-  }).join('');
-}
-
-function selectCountry(code, name, btn) {
-  if (selectedCountryCode === code) {
-    selectedCountryCode = null;
-    document.querySelectorAll('.country-pill').forEach(p => p.classList.remove('selected'));
-    document.getElementById('rbSearchInput').placeholder = 'Search stations…';
-    return;
-  }
-  selectedCountryCode = code;
-  document.querySelectorAll('.country-pill').forEach(p => p.classList.remove('selected'));
-  btn.classList.add('selected');
-  document.getElementById('rbSearchInput').placeholder = 'Search in ' + name + '…';
-}
-
-
-
-
-// Shared play/save helpers used by both search and browse results
-async function rbPlayFrom(data, i, actionsId) {
-  const r = data[i];
-  if (!r) return;
-  closeDrawer();
-  try {
-    await fetch('/radio-browser/play', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ streamUrl: r.streamUrl, name: r.name, favicon: r.favicon || '' })
-    });
-  } catch (err) { console.error('[rbPlayFrom]', err); }
-}
-
-async function rbSaveFrom(data, i, actionsId) {
-  const r = data[i];
-  if (!r) return;
-  const btn = document.querySelector(`#${actionsId} .save`);
-  if (btn) { btn.textContent = '…'; btn.disabled = true; }
-  try {
-    const res = await fetch('/stations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: r.name, url: r.streamUrl, favicon: r.favicon || '' })
-    });
-    if (res.ok) {
-      if (btn) btn.textContent = '✓ Saved';
-      await loadStations();
-    } else {
-      if (btn) { btn.textContent = '+ Save'; btn.disabled = false; }
-    }
-  } catch {
-    if (btn) { btn.textContent = '+ Save'; btn.disabled = false; }
-  }
-}
-
-// ── Radio Browser Search ─────────────────────────────────────────────────────
-let rbData      = [];
-let rbActiveIdx = null;
-
-async function rbSearch() {
-  const q = document.getElementById('rbSearchInput').value.trim();
-  if (!q) return;
-
-  const btn     = document.getElementById('rbSearchBtn');
-  const results = document.getElementById('rbResults');
-  const divider = document.getElementById('rbDivider');
-
-  btn.disabled = true;
-  btn.textContent = '…';
-  results.innerHTML = '<ul class="sheet-list"><li><span class="item-name" style="color:rgba(255,255,255,0.35)">Searching…</span></li></ul>';
-  divider.style.display = 'none';
-  rbActiveIdx = null;
-
-  try {
-    const countryParam = selectedCountryCode ? `&country=${selectedCountryCode}` : '';
-    rbData = await fetch(`/radio-browser/search?q=${encodeURIComponent(q)}${countryParam}`).then(r => r.json());
-    if (!rbData.length) {
-      results.innerHTML = '<ul class="sheet-list"><li><span class="item-name" style="color:rgba(255,255,255,0.35)">No results found</span></li></ul>';
-    } else {
-      rbRender();
-      divider.style.display = '';
-    }
-  } catch (err) {
-    console.error('[rbSearch]', err);
-    results.innerHTML = '<ul class="sheet-list"><li><span class="item-name" style="color:rgba(255,255,255,0.35)">Search failed — check connection</span></li></ul>';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Search';
-  }
-}
-
-function rbRender() {
-  const results = document.getElementById('rbResults');
-  results.innerHTML = `<ul class="sheet-list">${rbData.map((r, i) => {
-    const meta = [
-      r.country || null,
-      r.codec && r.bitrate ? `${r.codec} · ${r.bitrate} kbps` : (r.bitrate ? `${r.bitrate} kbps` : null)
-    ].filter(Boolean).join(' · ');
-    const isOpen = rbActiveIdx === i;
-    const favicon = r.favicon
-      ? `<img class="rb-favicon" src="${r.favicon}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><svg class="rb-favicon-fallback" style="display:none" viewBox="0 0 28 25" xmlns="http://www.w3.org/2000/svg"><rect x="18.5" y="0" width="3" height="8" rx="1.5"/><rect x="0" y="6" width="28" height="19" rx="4"/><circle cx="20" cy="15.5" r="6.5" fill="white" opacity="0.92"/><circle cx="5.5" cy="10.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="15.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="20.5" r="2" fill="white" opacity="0.92"/><circle cx="10"  cy="10.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10"  cy="15.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10"  cy="20.5" r="2.2" fill="white" opacity="0.92"/></svg>`
-      : `<svg class="rb-favicon-fallback" viewBox="0 0 28 25"><rect x="18.5" y="0" width="3" height="8" rx="1.5"/><rect x="0" y="6" width="28" height="19" rx="4"/><circle cx="20" cy="15.5" r="6.5" fill="white" opacity="0.92"/><circle cx="5.5" cy="10.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="15.5" r="2" fill="white" opacity="0.92"/><circle cx="5.5" cy="20.5" r="2" fill="white" opacity="0.92"/><circle cx="10" cy="10.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10" cy="15.5" r="2.2" fill="white" opacity="0.92"/><circle cx="10" cy="20.5" r="2.2" fill="white" opacity="0.92"/></svg>`;
-    return `<li>
-      <div class="rb-result-main" onclick="rbToggle(${i})">
-        <div class="rb-logo-wrap">${favicon}</div>
-        <div class="rb-result-info">
-          <div class="rb-result-name">${r.name}</div>
-          ${meta ? `<div class="rb-result-meta">${meta}</div>` : ''}
-        </div>
-        <div class="rb-chevron ${isOpen ? 'open' : ''}">
-          <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
-        </div>
-      </div>
-      <div class="rb-actions ${isOpen ? 'open' : ''}" id="rbA${i}">
-        <button class="rb-action-btn play" onclick="rbPlay(${i})">▶ Play Now</button>
-        <button class="rb-action-btn save" onclick="rbSave(${i})">+ Save</button>
-      </div>
-    </li>`;
-  }).join('')}</ul>`;
-}
-
-function rbToggle(i) {
-  rbActiveIdx = (rbActiveIdx === i) ? null : i;
-  rbRender();
-}
-
-async function rbPlay(i) { await rbPlayFrom(rbData, i, `rbA${i}`); }
-
-async function rbSave(i) {
-  const r = rbData[i];
-  if (!r) return;
-  const btn = document.querySelector(`#rbA${i} .save`);
-  if (btn) { btn.textContent = '…'; btn.disabled = true; }
-  try {
-    const res = await fetch('/stations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: r.name, url: r.streamUrl, favicon: r.favicon || '' })
-    });
-    if (res.ok) {
-      if (btn) btn.textContent = '✓ Saved';
-      await loadStations();
-    } else {
-      if (btn) { btn.textContent = '+ Save'; btn.disabled = false; }
-    }
-  } catch (err) {
-    console.error('[rbSave]', err);
-    if (btn) { btn.textContent = '+ Save'; btn.disabled = false; }
-  }
-}
-</script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(err => {
-          console.warn('SW registration failed:', err);
-        });
-      });
-    }
-  </script>
-
 <!-- Queue right drawer -->
-<div class="queue-overlay" id="queueOverlay" onclick="closeQueueDrawer(event)">
+<div class="queue-overlay" id="queueOverlay">
   <div class="queue-drawer">
     <div class="drawer-header">
       <span class="drawer-title">Up Next</span>
-      <button class="drawer-close" onclick="closeQueueDrawer()">
+      <button class="drawer-close queue-drawer-close">
         <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </button>
     </div>
@@ -2235,14 +231,14 @@ async function rbSave(i) {
   <div class="queue-confirm-box">
     <div class="queue-confirm-msg" id="queueConfirmMsg"></div>
     <div class="queue-confirm-btns">
-      <button class="queue-confirm-btn cancel" onclick="closeQueueConfirm()">Cancel</button>
+      <button class="queue-confirm-btn cancel">Cancel</button>
       <button class="queue-confirm-btn ok" id="queueConfirmOk">Skip</button>
     </div>
   </div>
 </div>
 
 <!-- Up Next flyout -->
-<div class="upnext-flyout" id="upnextFlyout" onclick="dismissUpNext()">
+<div class="upnext-flyout" id="upnextFlyout">
   <img class="upnext-art" id="upnextArt" src="" alt="" />
   <div class="upnext-info">
     <div class="upnext-label">Up Next</div>
@@ -2250,5 +246,78 @@ async function rbSave(i) {
     <div class="upnext-artist" id="upnextArtist"></div>
   </div>
 </div>
+
+<!-- Spotify Setup Wizard -->
+<div class="sp-wizard-overlay" id="spWizardOverlay">
+  <div class="sp-wizard">
+    <div class="sp-wizard-header">
+      <span class="sp-wizard-title">Connect Spotify</span>
+      <button class="sp-wizard-close">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+    <div class="sp-wizard-steps">
+      <div class="sp-wizard-step-dot active" id="spDot0"></div>
+      <div class="sp-wizard-step-dot" id="spDot1"></div>
+      <div class="sp-wizard-step-dot" id="spDot2"></div>
+      <div class="sp-wizard-step-dot" id="spDot3"></div>
+    </div>
+    <div class="sp-wizard-body">
+      <div class="sp-wizard-step active" id="spStep0">
+        <h2>Unlock Spotify Features</h2>
+        <p>Speaker Remote connects to Spotify's API to show your queue, progress bar, liked songs, and more. You'll need a free Spotify Developer account — it takes about 2 minutes to set up.</p>
+        <p>You'll need: a Spotify account (free or Premium) and access to a browser on this device.</p>
+        <button class="sp-wizard-btn primary">Get Started</button>
+        <button class="sp-wizard-btn secondary">Not Now</button>
+      </div>
+      <div class="sp-wizard-step" id="spStep1">
+        <h2>Create a Spotify App</h2>
+        <ol>
+          <li>Go to <strong>developer.spotify.com/dashboard</strong> and log in</li>
+          <li>Tap <strong>Create app</strong></li>
+          <li>Enter any name and description</li>
+          <li>Add this <strong>Redirect URI</strong> exactly as shown:</li>
+        </ol>
+        <div class="sp-redirect-uri">
+          <span id="spRedirectUriDisplay">Loading…</span>
+          <button class="sp-copy-btn">Copy</button>
+        </div>
+        <ol start="5">
+          <li>Check <strong>Web API</strong> under APIs used</li>
+          <li>Save the app</li>
+        </ol>
+        <button class="sp-wizard-btn primary">Open Spotify Dashboard</button>
+        <button class="sp-wizard-btn secondary">I've already done this</button>
+      </div>
+      <div class="sp-wizard-step" id="spStep2">
+        <h2>Enter Your Credentials</h2>
+        <p>In your Spotify app's Settings, copy the Client ID and Client Secret and paste them below.</p>
+        <input class="sp-wizard-input" id="spClientId" type="text" placeholder="Client ID" autocomplete="off" spellcheck="false" />
+        <input class="sp-wizard-input" id="spClientSecret" type="password" placeholder="Client Secret" autocomplete="off" />
+        <div class="sp-wizard-error" id="spSaveError"></div>
+        <button class="sp-wizard-btn primary" id="spSaveBtn">Save &amp; Continue</button>
+        <button class="sp-wizard-btn secondary">Back</button>
+      </div>
+      <div class="sp-wizard-step" id="spStep3">
+        <h2>Sign in to Spotify</h2>
+        <p>Tap the button below to open Spotify's sign-in page. After you approve access, you'll be redirected back and the connection will be complete.</p>
+        <button class="sp-wizard-btn primary">Sign in with Spotify</button>
+        <button class="sp-wizard-btn secondary">Back</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(err => {
+        console.warn('SW registration failed:', err);
+      });
+    });
+  }
+</script>
+<script type="module" src="/js/main.js"></script>
+
 </body>
 </html>
